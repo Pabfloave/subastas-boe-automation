@@ -85,6 +85,12 @@ jobs:
           python cli.py sync $FORCE_FLAG $LIMIT_FLAG
         timeout-minutes: 60
 
+      - name: Limpiar subastas finalizadas/canceladas
+        run: |
+          echo "🧹 Verificando y despublicando subastas finalizadas o canceladas..."
+          python cli.py cleanup
+        timeout-minutes: 30
+
       - name: Mostrar logs
         if: always()
         run: |

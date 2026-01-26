@@ -379,3 +379,58 @@ class WordPressClient:
         if response.status_code == 200:
             return response.json()
         return []
+
+    def unpublish_post(self, post_id: int) -> bool:
+        """
+        Despublica un post (lo pasa a borrador).
+
+        Args:
+            post_id: ID del post
+
+        Returns:
+            True si se despublicó correctamente
+        """
+        try:
+            response = requests.put(
+                f"{self.api_url}/posts/{post_id}",
+                headers=self.headers,
+                json={"status": "draft"},
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                logger.info(f"Post despublicado: ID {post_id}")
+                return True
+            else:
+                logger.error(f"Error despublicando post {post_id}: {response.status_code}")
+                return False
+
+        except requests.RequestException as e:
+            logger.error(f"Error de conexión despublicando post {post_id}: {e}")
+            return False
+
+    def get_post(self, post_id: int) -> Optional[Dict]:
+        """
+        Obtiene un post por su ID.
+
+        Args:
+            post_id: ID del post
+
+        Returns:
+            Datos del post o None si no existe
+        """
+        try:
+            response = requests.get(
+                f"{self.api_url}/posts/{post_id}",
+                headers=self.headers,
+                params={"status": "any"},
+                timeout=15
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            return None
+
+        except requests.RequestException as e:
+            logger.error(f"Error obteniendo post {post_id}: {e}")
+            return None

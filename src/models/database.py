@@ -460,3 +460,53 @@ class Database:
         if not row:
             return True  # No existe, es cambio
         return row[0] != nuevo_hash
+
+    def get_subastas_publicadas(self) -> List[Subasta]:
+        """Obtiene todas las subastas que han sido publicadas en WordPress."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT * FROM subastas
+            WHERE publicado_wp = 1 AND wp_post_id IS NOT NULL
+            ORDER BY fecha_conclusion DESC
+        """)
+
+        subastas = []
+        for row in cursor.fetchall():
+            subasta = self._row_to_subasta(row)
+            subasta.bienes = self._get_bienes(subasta.id_subasta)
+            subastas.append(subasta)
+        return subastas
+
+    def marcar_subasta_inactiva(self, id_subasta: str, nuevo_estado: str = "Finalizada"):
+        """Marca una subasta como inactiva y actualiza su estado."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            UPDATE subastas SET
+                activa = 0,
+                estado = ?,
+                fecha_actualizacion = ?
+            WHERE id_subasta = ?
+        """, (nuevo_estado, datetime.now().isoformat(), id_subasta))
+        self.conn.commit()
+
+    def get_subastas_para_verificar(self) -> List[dict]:
+        """
+        Obtiene subastas publicadas que necesitan verificación de estado.
+        Retorna solo los campos necesarios para la verificación.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT id_subasta, wp_post_id, estado, fecha_conclusion
+            FROM subastas
+            WHERE publicado_wp = 1 AND wp_post_id IS NOT NULL AND activa = 1
+        """)
+
+        subastas = []
+        for row in cursor.fetchall():
+            subastas.append({
+                "id_subasta": row["id_subasta"],
+                "wp_post_id": row["wp_post_id"],
+                "estado": row["estado"],
+                "fecha_conclusion": datetime.fromisoformat(row["fecha_conclusion"]) if row["fecha_conclusion"] else None,
+            })
+        return subastas

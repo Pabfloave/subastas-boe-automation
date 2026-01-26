@@ -288,6 +288,150 @@ def get_status() -> dict:
     return status
 
 
+class CleanupStats:
+    """Estadísticas de limpieza de subastas."""
+
+    def __init__(self):
+        self.verificadas = 0
+        self.finalizadas = 0
+        self.canceladas = 0
+        self.despublicadas = 0
+        self.errores = 0
+        self.start_time = datetime.now()
+
+    @property
+    def duracion(self) -> float:
+        return (datetime.now() - self.start_time).total_seconds()
+
+    def __str__(self) -> str:
+        return (
+            f"Verificadas: {self.verificadas}, "
+            f"Finalizadas: {self.finalizadas}, "
+            f"Canceladas: {self.canceladas}, "
+            f"Despublicadas: {self.despublicadas}, "
+            f"Errores: {self.errores}"
+        )
+
+
+def run_cleanup(dry_run: bool = False) -> CleanupStats:
+    """
+    Verifica el estado de subastas publicadas y despublica las finalizadas/canceladas.
+
+    Esta función:
+    1. Obtiene todas las subastas publicadas en WordPress
+    2. Verifica en el BOE si siguen activas
+    3. Si la subasta ya no existe o está finalizada/cancelada:
+       - Actualiza el estado en WordPress
+       - Despublica el post (lo pasa a borrador)
+       - Marca la subasta como inactiva en la BD local
+
+    Args:
+        dry_run: Si True, solo simula sin hacer cambios
+
+    Returns:
+        Estadísticas de la limpieza
+    """
+    logger.info("=" * 60)
+    logger.info("LIMPIEZA DE SUBASTAS FINALIZADAS/CANCELADAS")
+    logger.info("=" * 60)
+
+    if dry_run:
+        logger.info("MODO DRY-RUN: No se realizarán cambios")
+
+    stats = CleanupStats()
+
+    db = Database(settings.DB_PATH)
+    wp_client = WordPressClient()
+    wp_publisher = WordPressPublisher(wp_client)
+
+    try:
+        # Obtener subastas publicadas que necesitan verificación
+        subastas_publicadas = db.get_subastas_para_verificar()
+        logger.info(f"Subastas publicadas a verificar: {len(subastas_publicadas)}")
+
+        if not subastas_publicadas:
+            logger.info("No hay subastas publicadas para verificar")
+            return stats
+
+        with BOEScraper(headless=settings.SELENIUM_HEADLESS) as scraper:
+            for subasta_info in subastas_publicadas:
+                id_subasta = subasta_info["id_subasta"]
+                wp_post_id = subasta_info["wp_post_id"]
+                fecha_conclusion = subasta_info["fecha_conclusion"]
+
+                stats.verificadas += 1
+                logger.info(f"Verificando: {id_subasta}")
+
+                try:
+                    # Verificar si la subasta sigue activa en el BOE
+                    now = datetime.now()
+
+                    subasta_finalizada = False
+                    nuevo_estado = None
+
+                    # Si tiene fecha de conclusión y ya pasó, está finalizada
+                    if fecha_conclusion and now > fecha_conclusion:
+                        subasta_finalizada = True
+                        nuevo_estado = "Finalizada"
+                        stats.finalizadas += 1
+                        logger.info(f"  -> Finalizada por fecha (concluyó: {fecha_conclusion})")
+
+                    else:
+                        # Verificar en el BOE directamente
+                        subasta_boe = scraper.get_detalle_subasta(id_subasta)
+
+                        if subasta_boe is None:
+                            # La subasta ya no existe en el BOE (fue cancelada o eliminada)
+                            subasta_finalizada = True
+                            nuevo_estado = "Cancelada"
+                            stats.canceladas += 1
+                            logger.info(f"  -> Cancelada (no existe en BOE)")
+
+                        elif subasta_boe.estado:
+                            estado_lower = subasta_boe.estado.lower()
+                            if "finalizada" in estado_lower or "celebrada" in estado_lower:
+                                subasta_finalizada = True
+                                nuevo_estado = "Finalizada"
+                                stats.finalizadas += 1
+                                logger.info(f"  -> Finalizada (estado BOE: {subasta_boe.estado})")
+                            elif "cancelada" in estado_lower or "suspendida" in estado_lower:
+                                subasta_finalizada = True
+                                nuevo_estado = "Cancelada"
+                                stats.canceladas += 1
+                                logger.info(f"  -> Cancelada (estado BOE: {subasta_boe.estado})")
+
+                    # Si la subasta está finalizada o cancelada, despublicar
+                    if subasta_finalizada and nuevo_estado:
+                        if not dry_run:
+                            # Despublicar en WordPress
+                            if wp_publisher.despublicar_subasta(wp_post_id, nuevo_estado):
+                                stats.despublicadas += 1
+                                # Marcar como inactiva en BD
+                                db.marcar_subasta_inactiva(id_subasta, nuevo_estado)
+                                logger.info(f"  -> Despublicada y marcada como inactiva")
+                            else:
+                                stats.errores += 1
+                                logger.error(f"  -> Error al despublicar")
+                        else:
+                            logger.info(f"  -> [DRY-RUN] Se despublicaría con estado: {nuevo_estado}")
+
+                    # Pequeña pausa para no saturar el BOE
+                    time.sleep(1)
+
+                except Exception as e:
+                    logger.error(f"Error verificando {id_subasta}: {e}")
+                    stats.errores += 1
+
+    finally:
+        db.close()
+
+    logger.info("\n" + "=" * 60)
+    logger.info(f"LIMPIEZA COMPLETADA: {stats}")
+    logger.info("=" * 60)
+
+    return stats
+
+
 if __name__ == "__main__":
     # Ejecutar sincronización por defecto
     import sys
@@ -302,6 +446,8 @@ if __name__ == "__main__":
             print(f"  Provincias: {', '.join(status['config']['provincias'])}")
             print(f"  Subastas en BD: {status['database'].get('total_subastas', 0)}")
             print(f"  Publicadas: {status['database'].get('subastas_publicadas', 0)}")
+        elif sys.argv[1] == "cleanup":
+            run_cleanup()
         else:
             # Asumir código de provincia
             run_sync(provincia=sys.argv[1])

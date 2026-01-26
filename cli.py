@@ -275,6 +275,60 @@ def report(days):
         click.secho(f"❌ Error generando reporte: {e}", fg='red')
 
 
+@cli.command()
+@click.option('--dry-run', is_flag=True,
+              help='Simular sin realizar cambios')
+def cleanup(dry_run):
+    """
+    Verificar y despublicar subastas finalizadas o canceladas.
+
+    Este comando:
+    - Verifica el estado de todas las subastas publicadas
+    - Detecta subastas finalizadas (por fecha o estado en BOE)
+    - Detecta subastas canceladas (eliminadas del BOE)
+    - Despublica los posts (pasa a borrador) y actualiza el estado
+
+    Ejemplos:
+        python cli.py cleanup              # Ejecutar limpieza
+        python cli.py cleanup --dry-run    # Simular sin cambios
+    """
+    click.echo("=" * 60)
+    click.echo("LIMPIEZA DE SUBASTAS FINALIZADAS/CANCELADAS")
+    click.echo("=" * 60)
+
+    if dry_run:
+        click.secho("MODO DRY-RUN: No se realizarán cambios", fg='yellow')
+
+    click.echo("-" * 60)
+
+    from main import run_cleanup
+
+    try:
+        stats = run_cleanup(dry_run=dry_run)
+
+        # Mostrar resumen
+        click.echo("\n" + "=" * 60)
+        click.echo("RESUMEN")
+        click.echo("=" * 60)
+        click.echo(f"Subastas verificadas: {stats.verificadas}")
+        click.echo(f"Finalizadas: {stats.finalizadas}")
+        click.echo(f"Canceladas: {stats.canceladas}")
+        click.echo(f"Despublicadas: {stats.despublicadas}")
+        click.echo(f"Errores: {stats.errores}")
+        click.echo(f"Duración: {stats.duracion:.1f} segundos")
+
+        if stats.despublicadas > 0:
+            click.secho(f"✅ {stats.despublicadas} subastas despublicadas", fg='green')
+        elif stats.verificadas > 0:
+            click.secho("✅ Todas las subastas siguen activas", fg='green')
+        else:
+            click.echo("ℹ️  No hay subastas publicadas para verificar")
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg='red')
+        raise SystemExit(1)
+
+
 @cli.command('init-db')
 @click.option('--reset', is_flag=True, help='Eliminar y recrear tablas')
 def init_db(reset):

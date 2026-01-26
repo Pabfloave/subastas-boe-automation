@@ -393,3 +393,31 @@ class WordPressPublisher:
         except Exception as e:
             logger.error(f"Error actualizando estado de {id_subasta}: {e}")
             return False
+
+    def despublicar_subasta(self, wp_post_id: int, nuevo_estado: str = "Finalizada") -> bool:
+        """
+        Despublica una subasta (la pasa a borrador) y actualiza su estado.
+
+        Args:
+            wp_post_id: ID del post en WordPress
+            nuevo_estado: Nuevo estado a establecer en el meta
+
+        Returns:
+            True si se despublicó correctamente
+        """
+        try:
+            # Primero actualizar el estado en el meta
+            self.client.update_post(wp_post_id, {
+                "meta": {"_subasta_estado": nuevo_estado}
+            })
+
+            # Luego despublicar (pasar a borrador)
+            result = self.client.unpublish_post(wp_post_id)
+
+            if result:
+                logger.info(f"Subasta despublicada: Post ID {wp_post_id} -> Estado: {nuevo_estado}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error despublicando subasta (Post ID {wp_post_id}): {e}")
+            return False
