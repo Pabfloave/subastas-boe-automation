@@ -274,6 +274,15 @@ class SubastaParser:
         if not value:
             return None
 
+        # Limpiar el valor: quitar zona horaria y formato ISO adicional
+        # Formato BOE: "23-01-2026 18:00:00 CET  (ISO: 2026-01-23T18:00:00+01:00)"
+        cleaned = value.strip()
+
+        # Quitar todo después de CET, CEST, o (ISO
+        for separator in [' CET', ' CEST', '(ISO', ' (']:
+            if separator in cleaned:
+                cleaned = cleaned.split(separator)[0].strip()
+
         # Formatos comunes del BOE
         formatos = [
             "%d/%m/%Y %H:%M:%S",
@@ -283,12 +292,13 @@ class SubastaParser:
             "%d-%m-%Y %H:%M",
             "%d-%m-%Y",
             "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d",
         ]
 
         for fmt in formatos:
             try:
-                return datetime.strptime(value.strip(), fmt)
+                return datetime.strptime(cleaned, fmt)
             except ValueError:
                 continue
 
@@ -343,6 +353,25 @@ class SubastaParser:
         return provincias.get(nombre_provincia.lower().strip(), "")
 
     @staticmethod
+    def _inferir_estado(fecha_inicio: Optional[datetime], fecha_conclusion: Optional[datetime]) -> str:
+        """Infiere el estado de la subasta a partir de las fechas."""
+        now = datetime.now()
+
+        if fecha_inicio and fecha_conclusion:
+            if now < fecha_inicio:
+                return "Próxima"
+            elif now > fecha_conclusion:
+                return "Finalizada"
+            else:
+                return "Celebrándose"
+        elif fecha_inicio and now >= fecha_inicio:
+            return "Celebrándose"
+        elif fecha_conclusion and now > fecha_conclusion:
+            return "Finalizada"
+
+        return "En curso"
+
+    @staticmethod
     def crear_subasta_desde_detalle(
         datos_generales: Dict,
         bienes: List[Bien],
@@ -351,13 +380,22 @@ class SubastaParser:
         """
         Crea un objeto Subasta completo desde los datos parseados.
         """
+        # Parsear fechas primero
+        fecha_inicio = SubastaParser._parse_datetime(datos_generales.get("fecha_inicio", ""))
+        fecha_conclusion = SubastaParser._parse_datetime(datos_generales.get("fecha_conclusion", ""))
+
+        # Inferir estado si no está presente
+        estado = datos_generales.get("estado", "")
+        if not estado:
+            estado = SubastaParser._inferir_estado(fecha_inicio, fecha_conclusion)
+
         subasta = Subasta(
             id_subasta=datos_generales.get("id_subasta", ""),
             tipo_subasta=datos_generales.get("tipo_subasta", ""),
-            estado=datos_generales.get("estado", ""),
+            estado=estado,
             cuenta_expediente=datos_generales.get("cuenta_expediente", ""),
-            fecha_inicio=SubastaParser._parse_datetime(datos_generales.get("fecha_inicio", "")),
-            fecha_conclusion=SubastaParser._parse_datetime(datos_generales.get("fecha_conclusion", "")),
+            fecha_inicio=fecha_inicio,
+            fecha_conclusion=fecha_conclusion,
             cantidad_reclamada=SubastaParser._parse_decimal(datos_generales.get("cantidad_reclamada", "")),
             valor_subasta=SubastaParser._parse_decimal(datos_generales.get("valor_subasta", "")),
             tasacion=SubastaParser._parse_decimal(datos_generales.get("tasacion", "")),
