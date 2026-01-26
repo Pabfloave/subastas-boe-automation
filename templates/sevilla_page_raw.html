@@ -1,0 +1,1164 @@
+<!-- wp:html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subastas Judiciales en Sevilla 2026 - CAFAVE INVESTMENT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary: #0f172a;
+      --color-secondary: #1e293b;
+      --color-accent: #d97706;
+      --color-accent-light: #f59e0b;
+      --color-success: #059669;
+      --color-success-light: #dcfce7;
+      --color-info: #0284c7;
+      --color-info-light: #dbeafe;
+      --color-warning: #92400e;
+      --color-warning-light: #fef3c7;
+      --color-text: #1e293b;
+      --color-text-muted: #64748b;
+      --color-text-light: #475569;
+      --color-bg: #ffffff;
+      --color-bg-light: #f8fafc;
+      --color-bg-warm: #fffbeb;
+      --color-border: #e5e7eb;
+      --font-display: 'DM Serif Display', Georgia, serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-md: 0 8px 24px rgba(0,0,0,0.12);
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 15px;
+      --radius-full: 9999px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-body);
+      color: var(--color-text);
+      background: var(--color-bg-light);
+      line-height: 1.6;
+    }
+
+    .sevilla-page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    /* ===== INTRO SECTION ===== */
+    .intro-section {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+      color: white;
+      padding: 60px 40px;
+      border-radius: var(--radius-lg);
+      margin-bottom: 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .intro-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    .intro-section h1 {
+      font-family: var(--font-display);
+      font-size: 2.5em;
+      margin-bottom: 20px;
+      font-weight: 400;
+      position: relative;
+    }
+
+    .intro-section p {
+      font-size: 1.1em;
+      line-height: 1.8;
+      max-width: 900px;
+      margin: 0 auto 30px;
+      opacity: 0.95;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .stat-box {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 25px 20px;
+      border-radius: var(--radius-md);
+      text-align: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .stat-number {
+      font-family: var(--font-display);
+      font-size: 2.8em;
+      font-weight: 400;
+      color: var(--color-accent-light);
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-size: 0.85em;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      opacity: 0.9;
+    }
+
+    /* ===== SUBASTA CARDS ===== */
+    .subasta-card {
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.3s ease;
+    }
+
+    .subasta-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .subasta-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .subasta-title {
+      font-family: var(--font-display);
+      font-size: 1.4em;
+      font-weight: 400;
+      color: var(--color-text);
+      margin: 0 0 10px 0;
+    }
+
+    .subasta-ref {
+      font-size: 0.85em;
+      color: var(--color-text-muted);
+      font-family: 'SF Mono', 'Consolas', monospace;
+      background: var(--color-bg-light);
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      display: inline-block;
+    }
+
+    /* ===== BADGES ===== */
+    .badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: var(--radius-full);
+      font-size: 0.8em;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-primer-rango {
+      background: var(--color-success-light);
+      color: #166534;
+    }
+
+    .badge-info {
+      background: var(--color-info-light);
+      color: #1e40af;
+    }
+
+    .badge-warning {
+      background: var(--color-warning-light);
+      color: var(--color-warning);
+    }
+
+    /* ===== INFO GRID ===== */
+    .subasta-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin: 25px 0;
+    }
+
+    .info-item {
+      padding: 16px;
+      background: var(--color-bg-light);
+      border-left: 4px solid var(--color-accent-light);
+      border-radius: var(--radius-sm);
+    }
+
+    .info-label {
+      font-size: 0.8em;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .info-value {
+      font-size: 1.05em;
+      color: var(--color-text);
+      font-weight: 600;
+    }
+
+    .precio-destacado {
+      font-size: 1.3em;
+      color: var(--color-success);
+    }
+
+    /* ===== DOCUMENTACION ===== */
+    .documentacion-list {
+      background: var(--color-bg-warm);
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .documentacion-list h4 {
+      color: var(--color-warning);
+      margin: 0 0 15px 0;
+      font-size: 1em;
+      font-weight: 600;
+    }
+
+    .doc-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid #fde68a;
+      gap: 12px;
+    }
+
+    .doc-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .doc-icon {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      background: var(--color-accent-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 0.75em;
+    }
+
+    /* ===== LOTES ===== */
+    .lotes-section {
+      margin-top: 25px;
+    }
+
+    .lotes-title {
+      font-size: 1.1em;
+      color: var(--color-text);
+      margin-bottom: 15px;
+      font-weight: 600;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--color-border);
+    }
+
+    .lote-card {
+      padding: 20px;
+      border-radius: var(--radius-md);
+      margin-bottom: 12px;
+    }
+
+    .lote-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .lote-card--vivienda {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border-left: 4px solid var(--color-accent-light);
+    }
+
+    .lote-card--info {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border-left: 4px solid var(--color-info);
+    }
+
+    .lote-card--success {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border-left: 4px solid var(--color-success);
+    }
+
+    .lote-header {
+      font-size: 1.1em;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .lote-header--vivienda { color: var(--color-warning); }
+    .lote-header--info { color: #075985; }
+    .lote-header--success { color: #166534; }
+
+    .lote-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .lote-detail {
+      font-size: 0.9em;
+    }
+
+    .lote-detail-label {
+      color: var(--color-text-muted);
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .lote-detail-value {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .lote-note {
+      margin-top: 12px;
+      font-size: 0.9em;
+      color: var(--color-text-light);
+      line-height: 1.5;
+    }
+
+    /* ===== INFO BOX ===== */
+    .info-box {
+      padding: 15px 20px;
+      border-radius: var(--radius-md);
+      margin-top: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .info-box--tip {
+      background: #e0f2fe;
+      border-left: 4px solid var(--color-info);
+    }
+
+    .info-box--warning {
+      background: var(--color-warning-light);
+      border-left: 4px solid var(--color-accent);
+    }
+
+    .info-box-icon {
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+
+    .info-box-text {
+      font-size: 0.95em;
+      color: var(--color-text-light);
+    }
+
+    .info-box-text strong {
+      color: var(--color-text);
+    }
+
+    /* ===== SEO SECTION ===== */
+    .seo-section {
+      background: var(--color-bg);
+      padding: 40px;
+      border-radius: var(--radius-md);
+      margin: 40px 0;
+      line-height: 1.8;
+      border: 1px solid var(--color-border);
+    }
+
+    .seo-section h2 {
+      font-family: var(--font-display);
+      color: var(--color-text);
+      font-size: 1.8em;
+      margin-bottom: 20px;
+      font-weight: 400;
+    }
+
+    .seo-section h3 {
+      font-family: var(--font-display);
+      color: var(--color-text-light);
+      font-size: 1.3em;
+      margin: 30px 0 15px 0;
+      font-weight: 400;
+    }
+
+    .seo-section p {
+      color: var(--color-text-light);
+      margin-bottom: 15px;
+    }
+
+    .seo-section ul {
+      margin: 20px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .seo-section li {
+      padding: 8px 0 8px 28px;
+      position: relative;
+      color: var(--color-text-light);
+    }
+
+    .seo-section li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 14px;
+      width: 8px;
+      height: 8px;
+      background: var(--color-accent-light);
+      border-radius: 50%;
+    }
+
+    /* ===== CTA SECTION ===== */
+    .cta-section {
+      background: linear-gradient(135deg, var(--color-accent-light) 0%, var(--color-accent) 100%);
+      color: white;
+      padding: 50px 40px;
+      border-radius: var(--radius-lg);
+      text-align: center;
+      margin-top: 50px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    .cta-section h3 {
+      font-family: var(--font-display);
+      font-size: 1.8em;
+      margin-bottom: 15px;
+      position: relative;
+      font-weight: 400;
+    }
+
+    .cta-section p {
+      margin-bottom: 25px;
+      font-size: 1.05em;
+      opacity: 0.95;
+      position: relative;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: white;
+      color: var(--color-accent);
+      padding: 16px 36px;
+      border-radius: var(--radius-full);
+      font-weight: 700;
+      font-size: 1em;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      position: relative;
+    }
+
+    .cta-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .intro-section {
+        padding: 40px 25px;
+      }
+
+      .intro-section h1 {
+        font-size: 1.8em;
+      }
+
+      .subasta-card {
+        padding: 20px;
+      }
+
+      .subasta-header {
+        flex-direction: column;
+      }
+
+      .seo-section {
+        padding: 25px;
+      }
+
+      .cta-section {
+        padding: 35px 25px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="sevilla-page">
+
+  <!-- ===== INTRO SECTION ===== -->
+  <section class="intro-section">
+    <h1>🏛️ Subastas Judiciales en Sevilla 2026</h1>
+    <p>Acceda a las mejores oportunidades de inversión inmobiliaria en Sevilla mediante subastas judiciales del BOE. Información actualizada, documentación completa y asesoramiento profesional de CAFAVE INVESTMENT.</p>
+    
+    <div class="stats-grid">
+      <div class="stat-box">
+        <span class="stat-number">14</span>
+        <span class="stat-label">Subastas Activas</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">21</span>
+        <span class="stat-label">Lotes Disponibles</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">20%</span>
+        <span class="stat-label">Depósito Nuevo Régimen</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SUBASTA 1: SUB-JA-2025-244895 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">📍 Fincas Rústicas en Lora del Río</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-244895</span>
+      </div>
+      <span class="badge badge-info">3 Lotes Independientes</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Inst. e Instrucc. 3 – Lora del Río</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">09-02-2026 18:00:00</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">💰 Cantidad Reclamada</div>
+        <div class="info-value precio-destacado">170.137,71 €</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📄 Anuncio BOE</div>
+        <div class="info-value">BOE-B-2026-989</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Edicto completo de la subasta (TRES FINCAS, TRES LOTES)</span>
+      </div>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Certificación registral</span>
+      </div>
+    </div>
+
+    <div class="lotes-section">
+      <h3 class="lotes-title">📋 Detalle de Lotes</h3>
+
+      <!-- Lote 1 -->
+      <div class="lote-card lote-card--vivienda">
+        <h4 class="lote-header lote-header--vivienda">🏡 LOTE 1: Vivienda en Lora del Río</h4>
+        <div class="lote-grid">
+          <div class="lote-detail">
+            <div class="lote-detail-label">Tipo</div>
+            <div class="lote-detail-value">Vivienda Unifamiliar</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Superficie</div>
+            <div class="lote-detail-value">99,08 m²</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Valor Subasta</div>
+            <div class="lote-detail-value precio-destacado">49.450,83 €</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Depósito (5%)</div>
+            <div class="lote-detail-value">2.472,54 €</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Ubicación</div>
+            <div class="lote-detail-value">Sector U-5, Lora del Río</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Código Postal</div>
+            <div class="lote-detail-value">41440</div>
+          </div>
+        </div>
+        <p class="lote-note">
+          <strong>Registro:</strong> FINCA 14776 inscrita en el Registro de la Propiedad de Lora del Río al TOMO 761, LIBRO 247, FOLIO 17. Inscripción 2ª, ampliada por la 4ª, 7ª y 8ª.<br>
+          <strong>Nota:</strong> No visitable. Sin puja mínima. Tramos entre pujas: 989,02 €
+        </p>
+      </div>
+
+      <!-- Lote 2 -->
+      <div class="lote-card lote-card--info">
+        <h4 class="lote-header lote-header--info">🏡 LOTE 2: Vivienda en Lora del Río</h4>
+        <p class="lote-note">
+          <strong>Registro:</strong> FINCA 14777 inscrita en el Registro de la Propiedad de Lora del Río al TOMO 760, LIBRO 246, FOLIO 19. INSCRIPCIÓN 2ª, ampliada y modificada por la 4ª, 7ª y 8ª.
+        </p>
+      </div>
+
+      <!-- Lote 3 -->
+      <div class="lote-card lote-card--success">
+        <h4 class="lote-header lote-header--success">🏡 LOTE 3: Vivienda en Lora del Río</h4>
+        <p class="lote-note">
+          <strong>Registro:</strong> FINCA 14778 inscrita en el Registro de la Propiedad de Lora del Río al TOMO 760, FOLIO 21, LIBRO 246. INSCRIPCIÓN 2ª, MODIFICADA POR LA 4ª, AMPLIADAS POR LA 7ª Y POR LA 8ª.
+        </p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 2: SUB-JA-2025-250197 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏢 Inmuebles en Sevilla Capital</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-250197</span>
+      </div>
+      <span class="badge badge-info">Judicial Vía Apremio</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 18 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">2288/23</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📍 Provincia</div>
+        <div class="info-value">Sevilla</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Información registral disponible en portal BOE</span>
+      </div>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Detalle completo de la subasta (consultar en el portal)</span>
+      </div>
+    </div>
+
+    <div class="info-box info-box--tip">
+      <span class="info-box-icon">💡</span>
+      <p class="info-box-text"><strong>Información completa:</strong> Para acceder a todos los detalles, valoración, cargas y documentación completa, contacte con CAFAVE INVESTMENT. Analizamos la viabilidad y le acompañamos en todo el proceso.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 3: SUB-JA-2025-255060 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda en Sevilla Capital</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-255060</span>
+      </div>
+      <span class="badge badge-info">Judicial Vía Apremio</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 14 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">0279/24</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">09-02-2026 18:00:00</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Finca Nº 2.546 – Registro Propiedad Nº 4 de Sevilla, Tomo 3262, Libro 767, Folio 12</span>
+      </div>
+    </div>
+
+    <div class="info-box info-box--tip">
+      <span class="info-box-icon">💡</span>
+      <p class="info-box-text"><strong>Información completa:</strong> Contacte con CAFAVE INVESTMENT para acceder a todos los detalles, valoración, cargas y documentación completa.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 4: SUB-JA-2025-255372 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda Planta Baja – San Juan de Aznalfarache</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-255372</span>
+      </div>
+      <span class="badge badge-info">80 m² Construidos</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 25 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">2106/23</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">09-02-2026 18:00:00</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📍 Ubicación</div>
+        <div class="info-value">C/ Vicente Aleixandre, 4 – San Juan Aznalfarache</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Finca Nº 10349, Tomo 2302, Libro 388, Folio 97</span>
+      </div>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Referencia Catastral: 3491009QB6339S0009EG</span>
+      </div>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>IDUFIR: 41026000146347</span>
+      </div>
+    </div>
+
+    <div class="info-box info-box--tip">
+      <span class="info-box-icon">📝</span>
+      <p class="info-box-text"><strong>Descripción:</strong> Piso letra A, en planta baja, situado a la derecha mirando a la fachada. Superficie de 80,09 m² (88,57 m² con zonas comunes). Incluye trastero nº 1 en azotea de 4,72 m². Cuota de participación: 8,41%.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 5: SUB-JA-2025-256193 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda + Garaje en Dos Hermanas</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-256193</span>
+      </div>
+      <span class="badge badge-info">2 Lotes</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 14 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">1232/21</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">09-02-2026 18:00:00</div>
+      </div>
+    </div>
+
+    <div class="lotes-section">
+      <h3 class="lotes-title">📋 Detalle de Lotes</h3>
+
+      <div class="lote-card lote-card--info">
+        <h4 class="lote-header lote-header--info">LOTE 1: Vivienda + Plaza de Garaje</h4>
+        <p class="lote-note">Finca registral 18022 (vivienda) y 18015 (plaza de garaje) – Registro de Dos Hermanas nº 2</p>
+      </div>
+
+      <div class="lote-card lote-card--info">
+        <h4 class="lote-header lote-header--info">LOTE 2: Vivienda</h4>
+        <p class="lote-note">Finca registral 18084 – Registro de Dos Hermanas nº 2</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 6: SUB-JV-2025-256212 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda en Sevilla Capital</h2>
+        <span class="subasta-ref">Ref: SUB-JV-2025-256212</span>
+      </div>
+      <span class="badge badge-info">Judicial</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 14 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">1730/19</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">09-02-2026 18:00:00</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Finca Nº 1/5387 – Registro Propiedad nº 10 Sevilla, Tomo 1644, Libro 171, Folio 144</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 7: SUB-JA-2025-251236 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏭 Nave Industrial – Polígono Aeropuerto</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-251236</span>
+      </div>
+      <span class="badge badge-warning">1.500 m²</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 20 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">0231/22</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">04-02-2026 18:00:00</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📍 Ubicación</div>
+        <div class="info-value">Polígono Aeropuerto de Sevilla</div>
+      </div>
+    </div>
+
+    <div class="info-box info-box--tip">
+      <span class="info-box-icon">💡</span>
+      <p class="info-box-text"><strong>Información completa:</strong> Nave industrial de 1.500 m². Excelente oportunidad para inversores. Contacte con CAFAVE INVESTMENT para análisis detallado.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 8: SUB-JA-2025-252945 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda Habitual – El Cuervo de Sevilla</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-252945</span>
+      </div>
+      <span class="badge badge-primer-rango">Vivienda Habitual</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Sección Civil e Instrucción TI Lebrija – LEBRIJA</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">0442/16</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">28-01-2026 18:00:00</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Finca Registral 2.878 – Registro Propiedad Nº 2 de Utrera</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 9: SUB-NH-2025-1606100 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">📝 Subasta Notarial – Utrera</h2>
+        <span class="subasta-ref">Ref: SUB-NH-2025-1606100</span>
+      </div>
+      <span class="badge badge-info">Notaría</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">🏛️ Notaría</div>
+        <div class="info-value">Rosa María Muñoz Carrión – Utrera</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">28-01-2026 18:00:00</div>
+      </div>
+    </div>
+
+    <div class="info-box info-box--tip">
+      <span class="info-box-icon">💡</span>
+      <p class="info-box-text"><strong>Información completa:</strong> Subasta notarial. Ver detalle en contenido de subasta. Contacte con CAFAVE INVESTMENT para asesoramiento especializado.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 10: SUB-AT-2025-25R4186001631 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 50% Pleno Dominio – La Rinconada</h2>
+        <span class="subasta-ref">Ref: SUB-AT-2025-25R4186001631</span>
+      </div>
+      <span class="badge badge-warning">AEAT – 50%</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">🏛️ Organismo</div>
+        <div class="info-value">U.R. SUBASTAS ANDALUCÍA 41 – SEVILLA (AEAT)</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">26-01-2026 18:00:00</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📍 Ubicación</div>
+        <div class="info-value">Urbanización La Jarilla, C/ B, 13 – La Rinconada</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Finca Registral 5238</span>
+      </div>
+    </div>
+
+    <div class="info-box info-box--warning">
+      <span class="info-box-icon">⚠️</span>
+      <p class="info-box-text"><strong>Nota Importante:</strong> Subasta del 50% del pleno dominio. Requiere análisis especial de copropiedad. Contacte con CAFAVE INVESTMENT.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 11: SUB-JA-2025-255270 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda Unifamiliar – Burguillos</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-255270</span>
+      </div>
+      <span class="badge badge-info">156 m² Construidos</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 25 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">0187/24</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">26-01-2026 18:00:00</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📍 Ubicación</div>
+        <div class="info-value">Calle D, Manzana 5, PP-NO-R2 "LAS CARDONAS" – Burguillos</div>
+      </div>
+    </div>
+
+    <div class="documentacion-list">
+      <h4>📄 Documentación Disponible</h4>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Registro Propiedad nº 8 Sevilla, Folio 97, Tomo 2.045, Libro 61</span>
+      </div>
+      <div class="doc-item">
+        <span class="doc-icon">✓</span>
+        <span>Finca 3.340 – CRU: 41026000806449</span>
+      </div>
+    </div>
+
+    <div class="info-box info-box--tip">
+      <span class="info-box-icon">📝</span>
+      <p class="info-box-text"><strong>Descripción:</strong> Vivienda nº 21 distribuida en dos plantas. Planta baja: cocina, salón comedor y aseo. Planta primera: tres dormitorios (uno con baño propio) y baño común. Solar de 99,05 m². Cuota: 3,90%.</p>
+    </div>
+  </article>
+
+  <!-- ===== SUBASTA 12: SUB-JA-2025-255978 ===== -->
+  <article class="subasta-card">
+    <header class="subasta-header">
+      <div>
+        <h2 class="subasta-title">🏠 Vivienda + Local Comercial – Gerena</h2>
+        <span class="subasta-ref">Ref: SUB-JA-2025-255978</span>
+      </div>
+      <span class="badge badge-info">2 Lotes</span>
+    </header>
+
+    <div class="subasta-info-grid">
+      <div class="info-item">
+        <div class="info-label">⚖️ Juzgado</div>
+        <div class="info-value">Juzgado 1ª Instancia 16 – Sevilla</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📋 Expediente</div>
+        <div class="info-value">0960/10</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">📅 Fecha de Conclusión</div>
+        <div class="info-value">26-01-2026 18:00:00</div>
+      </div>
+    </div>
+
+    <div class="lotes-section">
+      <h3 class="lotes-title">📋 Detalle de Lotes</h3>
+
+      <div class="lote-card lote-card--vivienda">
+        <h4 class="lote-header lote-header--vivienda">LOTE 1: Vivienda en Planta Alta</h4>
+        <div class="lote-grid">
+          <div class="lote-detail">
+            <div class="lote-detail-label">Valor</div>
+            <div class="lote-detail-value precio-destacado">204.820,81 €</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Superficie</div>
+            <div class="lote-detail-value">112 m² construidos</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Finca</div>
+            <div class="lote-detail-value">6047</div>
+          </div>
+          <div class="lote-detail">
+            <div class="lote-detail-label">Dirección</div>
+            <div class="lote-detail-value">C/ Rodadera, 12 – Gerena</div>
+          </div>
+        </div>
+        <p class="lote-note">
+          <strong>Ref. Catastral:</strong> 1585006QB2518S0001AD<br>
+          <span class="badge badge-primer-rango" style="margin-top: 8px; display: inline-block;">Vivienda Habitual</span>
+        </p>
+      </div>
+
+      <div class="lote-card lote-card--info">
+        <h4 class="lote-header lote-header--info">LOTE 2: Local Comercial Planta Baja</h4>
+        <p class="lote-note">Información de valor y características disponible bajo solicitud. Contacte con CAFAVE INVESTMENT para detalles completos.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===== SEO SECTION ===== -->
+  <section class="seo-section">
+    <h2>¿Cómo Comprar en Subastas Judiciales en Sevilla?</h2>
+    
+    <p>Las <strong>subastas judiciales en Sevilla</strong> representan una oportunidad única para adquirir inmuebles a precios significativamente inferiores al mercado. En CAFAVE INVESTMENT, somos expertos en el análisis y gestión integral de subastas del BOE en toda la provincia de Sevilla, incluyendo la capital y localidades como Lora del Río, Dos Hermanas, Alcalá de Guadaíra, Utrera y Écija.</p>
+
+    <h3>Nueva Ley de Eficiencia del Servicio Público de Justicia 1/2025</h3>
+    
+    <p>Es fundamental conocer que desde abril de 2025 coexisten dos regímenes de subastas judiciales:</p>
+    
+    <ul>
+      <li><strong>Procedimientos ANTIGUOS</strong> (iniciados antes del 03/04/2025): Depósito del 5% y plazo de remate de 40 días hábiles</li>
+      <li><strong>Procedimientos NUEVOS</strong> (iniciados desde el 03/04/2025): Depósito del 20% y plazo de remate reducido a 20 días</li>
+    </ul>
+
+    <h3>Servicios de CAFAVE INVESTMENT para Subastas en Sevilla</h3>
+    
+    <p>Nuestro despacho especializado en procesal bancario ofrece:</p>
+    
+    <ul>
+      <li><strong>Análisis de cargas hipotecarias</strong>: Identificamos si es primer rango y qué cargas asume el adjudicatario</li>
+      <li><strong>Estudio de rentabilidad</strong>: Valoramos el potencial de inversión real de cada inmueble</li>
+      <li><strong>Certificación registral</strong>: Revisión exhaustiva de la situación jurídica del bien</li>
+      <li><strong>Estrategia de puja</strong>: Determinamos el precio límite de adquisición (Strike Price) óptimo</li>
+      <li><strong>Gestión completa</strong>: Desde el depósito hasta la toma de posesión</li>
+      <li><strong>Intermediación profesional</strong>: Contacto directo con nuestro despacho experto en procesal bancario</li>
+    </ul>
+
+    <h3>¿Por Qué Invertir en Subastas Judiciales de Sevilla?</h3>
+    
+    <p>Sevilla es uno de los mercados inmobiliarios más atractivos de Andalucía. Las subastas judiciales permiten:</p>
+    
+    <ul>
+      <li>Adquirir propiedades con <strong>descuentos del 30% al 50%</strong> respecto al valor de mercado</li>
+      <li>Acceder a viviendas en zonas prime de Sevilla capital</li>
+      <li>Invertir en fincas rústicas en la campiña sevillana</li>
+      <li>Oportunidades de alto rendimiento para inversores cualificados</li>
+      <li>Seguridad jurídica con respaldo judicial</li>
+    </ul>
+
+    <h3>Zonas de Sevilla con Más Subastas Activas</h3>
+    
+    <p>Actualmente monitorizamos subastas judiciales en:</p>
+    
+    <ul>
+      <li><strong>Sevilla Capital</strong>: Centro histórico, Nervión, Triana, Los Remedios</li>
+      <li><strong>Área Metropolitana</strong>: Dos Hermanas, Alcalá de Guadaíra, Mairena del Aljarafe</li>
+      <li><strong>Campiña</strong>: Lora del Río, Écija, Carmona, Marchena</li>
+      <li><strong>Aljarafe</strong>: Camas, Castilleja de la Cuesta, Tomares</li>
+    </ul>
+  </section>
+
+  <!-- ===== CTA SECTION ===== -->
+  <section class="cta-section">
+    <h3>¿Interesado en Alguna de Estas Subastas?</h3>
+    <p>Complete su perfil inversor y reciba un análisis personalizado de las mejores oportunidades en Sevilla</p>
+    <a href="#solicitud-perfil" class="cta-button">📋 SOLICITAR ANÁLISIS GRATUITO</a>
+  </section>
+
+</div>
+
+</body>
+</html>
+<!-- /wp:html -->

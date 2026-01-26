@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# Environment variables (contiene credenciales)
+.env
+
+# Base de datos local
+data/*.db
+data/*.db-journal
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Chrome/Selenium
+*.crx
+chromedriver
+
+# Distribución
+dist/
+build/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
