@@ -691,15 +691,70 @@ class WordPressPublisher:
 """
                 # Mapa de Google Maps si hay dirección
                 if bien.direccion and bien.localidad:
-                    direccion_completa = f"{bien.direccion}, {bien.localidad}"
+                    # Limpiar dirección para Google Maps
+                    import re
+                    import urllib.parse
+
+                    def limpiar_direccion_para_maps(direccion: str) -> str:
+                        """
+                        Limpia la dirección del BOE para que Google Maps la reconozca mejor.
+                        Maneja casos como:
+                        - "Nº82" sin espacio -> "Nº 82"
+                        - "PORTAL 4, LOCAL G" -> elimina detalles de piso/local
+                        - "planta 2º A de la Calle X, hoy Calle Y" -> usa la dirección actual
+                        """
+                        if not direccion:
+                            return ""
+
+                        d = direccion
+
+                        # 1. Si hay "hoy Calle X", usar la dirección actual (prioritario)
+                        if 'hoy ' in d.lower():
+                            match = re.search(r'hoy\s+((?:Calle|CL|C/|Avenida|Av|Avda|Plaza|Paseo)[^,]*(?:,?\s*(?:nº|n\.|núm\.?|número)?\s*\d+)?)', d, re.IGNORECASE)
+                            if match:
+                                d = match.group(1).strip()
+                                # Limpiar "de Sevilla" al final si está
+                                d = re.sub(r'\s+de\s+\w+$', '', d)
+
+                        # 2. Si empieza con "planta X de la Calle...", extraer solo la calle
+                        elif d.lower().startswith(('planta', 'piso', 'local', 'bajo', 'ático', 'atico', 'puerta')):
+                            match = re.search(r'(?:de la |de |en la |en )?((?:Calle|CL|C/|Avenida|Av|Avda|Plaza|Pz|Paseo|Camino|Carretera|Ctra)[^,]*)', d, re.IGNORECASE)
+                            if match:
+                                d = match.group(1).strip()
+
+                        # 3. Separar "Nº82" -> "Nº 82", "nº15" -> "nº 15", "N.12" -> "N. 12"
+                        d = re.sub(r'(Nº|nº|N\.|n\.|Num\.?|núm\.?)(\d)', r'\1 \2', d)
+
+                        # 4. Eliminar detalles de planta/puerta/portal/local que confunden a Maps
+                        patrones_eliminar = [
+                            r',?\s*(?:planta|piso|pta|puerta|pto|portal|local|bajo|entreplanta|ent|escalera|esc)\s*[^,]*',
+                            r',?\s*\d+º\s*[A-Za-z]?\s*$',  # "2º A" al final
+                            r',?\s*(?:bloque|blq|edificio|edif)\s*[^,]*',
+                        ]
+                        for patron in patrones_eliminar:
+                            d = re.sub(patron, '', d, flags=re.IGNORECASE)
+
+                        # 5. Limpiar espacios múltiples y comas sueltas
+                        d = re.sub(r'\s+', ' ', d)
+                        d = re.sub(r',\s*,', ',', d)
+                        d = re.sub(r',\s*$', '', d)
+                        d = d.strip(' ,')
+
+                        return d
+
+                    direccion_maps = limpiar_direccion_para_maps(bien.direccion)
+                    direccion_completa = f"{direccion_maps}, {bien.localidad}"
                     if bien.provincia:
                         direccion_completa += f", {bien.provincia}"
                     if bien.codigo_postal:
                         direccion_completa += f", {bien.codigo_postal}"
                     direccion_completa += ", España"
 
-                    # Codificar dirección para URL
-                    import urllib.parse
+                    # Dirección original para mostrar al usuario
+                    direccion_original = f"{bien.direccion}, {bien.localidad}"
+                    if bien.provincia:
+                        direccion_original += f", {bien.provincia}"
+
                     direccion_encoded = urllib.parse.quote(direccion_completa)
 
                     html += f"""
@@ -717,7 +772,7 @@ class WordPressPublisher:
                     referrerpolicy="no-referrer-when-downgrade">
                 </iframe>
             </div>
-            <p class="mapa-direccion"><strong>Dirección:</strong> {direccion_completa}</p>
+            <p class="mapa-direccion"><strong>Dirección:</strong> {direccion_original}</p>
             <a href="https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
                target="_blank"
                rel="nofollow"
