@@ -900,13 +900,22 @@ class WordPressPublisher:
         # Número de lotes
         num_lotes = len(subasta.bienes)
 
+        # Para subastas multi-lote, calcular valor y depósito totales
+        # sumando los valores de cada lote si el valor general es 0
+        valor_mostrar = subasta.valor_subasta
+        deposito_mostrar = subasta.importe_deposito
+        if num_lotes > 1 and valor_mostrar == 0:
+            from decimal import Decimal
+            valor_mostrar = sum((b.valor_subasta_lote for b in subasta.bienes), Decimal("0"))
+            deposito_mostrar = sum((b.importe_deposito_lote for b in subasta.bienes), Decimal("0"))
+
         meta = {
             # Datos internos de la subasta
             "_subasta_id": subasta.id_subasta,
             "_subasta_tipo": subasta.tipo_subasta or "",
             "_subasta_estado": subasta.estado or "",
-            "_subasta_valor": str(subasta.valor_subasta),
-            "_subasta_deposito": str(subasta.importe_deposito),
+            "_subasta_valor": str(valor_mostrar),
+            "_subasta_deposito": str(deposito_mostrar),
             "_subasta_fecha_inicio": subasta.fecha_inicio.isoformat() if subasta.fecha_inicio else "",
             "_subasta_fecha_fin": subasta.fecha_conclusion.isoformat() if subasta.fecha_conclusion else "",
             "_subasta_num_lotes": str(num_lotes),
@@ -932,12 +941,21 @@ class WordPressPublisher:
                 "_bien_cp": bien.codigo_postal or "",
             })
 
-        # Si hay múltiples lotes, agregar resumen de tipos
+        # Si hay múltiples lotes, agregar resumen de tipos y localidad
         if num_lotes > 1:
             tipos_lotes = [b.subtipo_bien or b.tipo_bien or "Inmueble" for b in subasta.bienes]
             meta["_bien_tipo"] = f"{num_lotes} lotes: " + ", ".join(tipos_lotes[:3])
             if num_lotes > 3:
                 meta["_bien_tipo"] += f" (+{num_lotes - 3} más)"
+
+            # Usar la primera localidad disponible de cualquier lote
+            for b in subasta.bienes:
+                if b.localidad:
+                    meta["_bien_localidad"] = b.localidad
+                    break
+                if b.provincia:
+                    meta["_bien_provincia"] = b.provincia
+                    break
 
         return meta
 

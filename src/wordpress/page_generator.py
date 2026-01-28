@@ -691,11 +691,11 @@ class ProvinciaPageGenerator:
 
             <div class="subasta-info-grid">
               <div class="info-item">
-                <div class="info-label">💰 Valor Subasta</div>
+                <div class="info-label">💰 Valor Subasta${{numLotes > 1 ? ' (Total)' : ''}}</div>
                 <div class="info-value precio-destacado">${{valor}}</div>
               </div>
               <div class="info-item">
-                <div class="info-label">🏷️ Depósito</div>
+                <div class="info-label">🏷️ Depósito${{numLotes > 1 ? ' (Total)' : ''}}</div>
                 <div class="info-value">${{deposito}}</div>
               </div>
               <div class="info-item">
