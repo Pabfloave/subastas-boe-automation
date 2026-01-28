@@ -352,6 +352,33 @@ class ProvinciaPageGenerator:
       color: var(--color-warning);
     }}
 
+    .badge-lotes {{
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      color: white;
+    }}
+
+    .badges-container {{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
+
+    .subasta-card.multi-lotes {{
+      border: 2px solid #3b82f6;
+      position: relative;
+    }}
+
+    .subasta-card.multi-lotes::before {{
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }}
+
     .subasta-info-grid {{
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -636,6 +663,7 @@ class ProvinciaPageGenerator:
         const estado = meta._subasta_estado || meta['_subasta_estado'] || 'En curso';
         const tipo = meta._bien_tipo || meta['_bien_tipo'] || 'Inmueble';
         const localidad = meta._bien_localidad || meta['_bien_localidad'] || PROVINCIA;
+        const numLotes = parseInt(meta._subasta_num_lotes || meta['_subasta_num_lotes'] || '1');
 
         // Determinar badge
         let badgeClass = 'badge-info';
@@ -645,14 +673,20 @@ class ProvinciaPageGenerator:
           badgeText = 'En Curso';
         }}
 
+        // Badge de múltiples lotes
+        const lotesBadge = numLotes > 1 ? `<span class="badge badge-lotes">📦 ${{numLotes}} Lotes</span>` : '';
+
         html += `
-          <article class="subasta-card">
+          <article class="subasta-card ${{numLotes > 1 ? 'multi-lotes' : ''}}">
             <header class="subasta-header">
               <div>
                 <h2 class="subasta-title"><a href="${{link}}">${{titulo}}</a></h2>
                 <span class="subasta-ref">Ref: ${{id}}</span>
               </div>
-              <span class="badge ${{badgeClass}}">${{badgeText}}</span>
+              <div class="badges-container">
+                ${{lotesBadge}}
+                <span class="badge ${{badgeClass}}">${{badgeText}}</span>
+              </div>
             </header>
 
             <div class="subasta-info-grid">

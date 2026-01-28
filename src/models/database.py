@@ -85,9 +85,31 @@ class Database:
                 cargas TEXT,
                 valor_tasacion REAL,
                 fotos_urls TEXT,
+                valor_subasta_lote REAL DEFAULT 0,
+                importe_deposito_lote REAL DEFAULT 0,
+                puja_minima_lote REAL DEFAULT 0,
+                tramos_pujas_lote REAL DEFAULT 0,
                 FOREIGN KEY (id_subasta) REFERENCES subastas(id_subasta)
             )
         """)
+
+        # Migrar tabla bienes existente si falta columnas nuevas
+        try:
+            cursor.execute("ALTER TABLE bienes ADD COLUMN valor_subasta_lote REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # La columna ya existe
+        try:
+            cursor.execute("ALTER TABLE bienes ADD COLUMN importe_deposito_lote REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE bienes ADD COLUMN puja_minima_lote REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE bienes ADD COLUMN tramos_pujas_lote REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
 
         # Tabla de log de sincronización
         cursor.execute("""
@@ -175,6 +197,12 @@ class Database:
         bienes = []
         for row in rows:
             fotos = json.loads(row["fotos_urls"]) if row["fotos_urls"] else []
+            # Obtener valores económicos por lote (con fallback para BD antigua)
+            valor_subasta_lote = row["valor_subasta_lote"] if "valor_subasta_lote" in row.keys() else 0
+            importe_deposito_lote = row["importe_deposito_lote"] if "importe_deposito_lote" in row.keys() else 0
+            puja_minima_lote = row["puja_minima_lote"] if "puja_minima_lote" in row.keys() else 0
+            tramos_pujas_lote = row["tramos_pujas_lote"] if "tramos_pujas_lote" in row.keys() else 0
+
             bien = Bien(
                 id=row["id"],
                 id_subasta=row["id_subasta"],
@@ -192,6 +220,10 @@ class Database:
                 cargas=row["cargas"] or "",
                 valor_tasacion=Decimal(str(row["valor_tasacion"] or 0)),
                 fotos_urls=fotos,
+                valor_subasta_lote=Decimal(str(valor_subasta_lote or 0)),
+                importe_deposito_lote=Decimal(str(importe_deposito_lote or 0)),
+                puja_minima_lote=Decimal(str(puja_minima_lote or 0)),
+                tramos_pujas_lote=Decimal(str(tramos_pujas_lote or 0)),
             )
             bienes.append(bien)
         return bienes
@@ -259,8 +291,9 @@ class Database:
                 id_subasta, numero_bien, tipo_bien, subtipo_bien,
                 descripcion, direccion, codigo_postal, localidad,
                 provincia, provincia_codigo, situacion_posesoria,
-                visitable, cargas, valor_tasacion, fotos_urls
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                visitable, cargas, valor_tasacion, fotos_urls,
+                valor_subasta_lote, importe_deposito_lote, puja_minima_lote, tramos_pujas_lote
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             bien.id_subasta,
             bien.numero_bien,
@@ -277,6 +310,10 @@ class Database:
             bien.cargas,
             float(bien.valor_tasacion),
             json.dumps(bien.fotos_urls),
+            float(bien.valor_subasta_lote),
+            float(bien.importe_deposito_lote),
+            float(bien.puja_minima_lote),
+            float(bien.tramos_pujas_lote),
         ))
 
     def update_subasta(self, subasta: Subasta):

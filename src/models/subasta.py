@@ -28,6 +28,11 @@ class Bien:
     cargas: str = ""
     valor_tasacion: Decimal = Decimal("0")
     fotos_urls: List[str] = field(default_factory=list)
+    # Valores económicos específicos del lote
+    valor_subasta_lote: Decimal = Decimal("0")
+    importe_deposito_lote: Decimal = Decimal("0")
+    puja_minima_lote: Decimal = Decimal("0")
+    tramos_pujas_lote: Decimal = Decimal("0")
 
     def to_dict(self) -> dict:
         """Convierte el bien a diccionario."""
@@ -48,6 +53,10 @@ class Bien:
             "cargas": self.cargas,
             "valor_tasacion": str(self.valor_tasacion),
             "fotos_urls": self.fotos_urls,
+            "valor_subasta_lote": str(self.valor_subasta_lote),
+            "importe_deposito_lote": str(self.importe_deposito_lote),
+            "puja_minima_lote": str(self.puja_minima_lote),
+            "tramos_pujas_lote": str(self.tramos_pujas_lote),
         }
 
     @classmethod
@@ -70,6 +79,10 @@ class Bien:
             cargas=data.get("cargas", ""),
             valor_tasacion=Decimal(data.get("valor_tasacion", "0")),
             fotos_urls=data.get("fotos_urls", []),
+            valor_subasta_lote=Decimal(data.get("valor_subasta_lote", "0")),
+            importe_deposito_lote=Decimal(data.get("importe_deposito_lote", "0")),
+            puja_minima_lote=Decimal(data.get("puja_minima_lote", "0")),
+            tramos_pujas_lote=Decimal(data.get("tramos_pujas_lote", "0")),
         )
 
 

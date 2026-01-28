@@ -343,14 +343,51 @@ class BOEScraper:
             html_autoridad = self.driver.page_source
             datos_autoridad = self.parser.parse_autoridad_gestora(html_autoridad)
 
-            # Pestaña 3: Bienes
+            # Pestaña 3: Bienes - Primero cargar página principal para detectar lotes
             url_bienes = f"{self.detail_url}?idSub={id_subasta}&ver=3"
             self.driver.get(url_bienes)
             self._wait_for_page_load()
             time.sleep(self.delay)
 
             html_bienes = self.driver.page_source
-            bienes = self.parser.parse_detalle_bienes(html_bienes, id_subasta)
+
+            # Detectar si hay múltiples lotes buscando enlaces Lote1, Lote2, etc.
+            from bs4 import BeautifulSoup
+            import re
+            soup = BeautifulSoup(html_bienes, 'lxml')
+
+            # Buscar enlaces de lotes individuales (ej: idLote=1, idLote=2)
+            lote_links = soup.select('a[href*="idLote="]')
+            lote_numbers = set()
+            for link in lote_links:
+                href = link.get('href', '')
+                match = re.search(r'idLote=(\d+)', href)
+                if match:
+                    lote_numbers.add(int(match.group(1)))
+
+            bienes = []
+
+            if lote_numbers:
+                # Hay múltiples lotes - cargar cada uno individualmente
+                logger.info(f"Detectados {len(lote_numbers)} lotes para {id_subasta}")
+                for lote_num in sorted(lote_numbers):
+                    url_lote = f"{self.detail_url}?idSub={id_subasta}&ver=3&idLote={lote_num}"
+                    self.driver.get(url_lote)
+                    self._wait_for_page_load()
+                    time.sleep(self.delay / 2)  # Delay más corto entre lotes
+
+                    html_lote = self.driver.page_source
+                    lote_bienes = self.parser.parse_detalle_bienes(html_lote, id_subasta)
+
+                    # Asignar número de lote correcto
+                    for bien in lote_bienes:
+                        bien.numero_bien = lote_num
+
+                    bienes.extend(lote_bienes)
+                    logger.debug(f"Lote {lote_num}: {len(lote_bienes)} bienes extraídos")
+            else:
+                # Solo un lote o estructura diferente - usar método original
+                bienes = self.parser.parse_detalle_bienes(html_bienes, id_subasta)
 
             # Crear objeto Subasta
             subasta = self.parser.crear_subasta_desde_detalle(

@@ -167,6 +167,11 @@ class SubastaParser:
             "Cargas": "cargas",
             "Valor de tasación": "valor_tasacion",
             "Valoración": "valor_tasacion",
+            # Campos económicos por lote
+            "Valor Subasta": "valor_subasta_lote",
+            "Importe del depósito": "importe_deposito_lote",
+            "Puja mínima": "puja_minima_lote",
+            "Tramos entre pujas": "tramos_pujas_lote",
         }
 
         # Extraer campos de la sección
@@ -181,8 +186,8 @@ class SubastaParser:
 
                 for key_label, field_name in field_mapping.items():
                     if key_label.lower() in label.lower():
-                        if field_name == "valor_tasacion":
-                            bien.valor_tasacion = SubastaParser._parse_decimal(value)
+                        if field_name in ["valor_tasacion", "valor_subasta_lote", "importe_deposito_lote", "puja_minima_lote", "tramos_pujas_lote"]:
+                            setattr(bien, field_name, SubastaParser._parse_decimal(value))
                         else:
                             setattr(bien, field_name, value)
                         break

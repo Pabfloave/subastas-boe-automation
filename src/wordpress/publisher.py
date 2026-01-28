@@ -80,18 +80,330 @@ class WordPressPublisher:
         return self.client.get_post_by_meta("_subasta_id", id_subasta)
 
     def _generate_title(self, subasta: Subasta) -> str:
-        """Genera el título SEO-friendly del post."""
+        """
+        Genera el título SEO-optimizado del post.
+
+        Formato: "Subasta [Tipo] en [Localidad] desde [Precio] - [Provincia]"
+        Ejemplo: "Subasta Piso en Sevilla desde 45.000€ - Andalucía"
+        """
         bien = subasta.get_bien_principal()
 
-        if bien:
-            tipo = bien.subtipo_bien or "Inmueble"
-            localidad = bien.localidad or "Andalucía"
-            return f"Subasta {tipo} en {localidad}"
-        else:
-            return f"Subasta BOE {subasta.id_subasta}"
+        # Tipo de inmueble
+        tipo = "Inmueble"
+        if bien and bien.subtipo_bien:
+            tipo = bien.subtipo_bien.title()
+
+        # Localidad
+        localidad = "Andalucía"
+        if bien and bien.localidad:
+            localidad = bien.localidad.title()
+
+        # Precio formateado (sin decimales para título más limpio)
+        precio_str = ""
+        if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
+            precio = float(subasta.valor_subasta)
+            if precio >= 1000:
+                precio_str = f" desde {precio:,.0f}€".replace(",", ".")
+
+        # Provincia para contexto geográfico
+        provincia = ""
+        if bien and bien.provincia and bien.provincia.lower() != localidad.lower():
+            provincia = f" - {bien.provincia}"
+
+        return f"Subasta {tipo} en {localidad}{precio_str}{provincia}"
+
+    def _generate_meta_description(self, subasta: Subasta) -> str:
+        """
+        Genera la meta description SEO-optimizada.
+
+        Formato: "🏠 Subasta judicial de [tipo] en [localidad], [provincia].
+                  Valor: [precio]€. Finaliza [fecha]. Asesoramiento legal gratuito."
+
+        Máximo 155-160 caracteres para evitar truncamiento en Google.
+        """
+        bien = subasta.get_bien_principal()
+
+        # Tipo de inmueble
+        tipo = "inmueble"
+        if bien and bien.subtipo_bien:
+            tipo = bien.subtipo_bien.lower()
+
+        # Ubicación
+        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
+        provincia = bien.provincia if bien and bien.provincia else ""
+
+        ubicacion = localidad
+        if provincia and provincia.lower() != localidad.lower():
+            ubicacion = f"{localidad}, {provincia}"
+
+        # Precio
+        precio_str = "Consultar precio"
+        if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
+            precio = float(subasta.valor_subasta)
+            precio_str = f"{precio:,.0f}€".replace(",", ".")
+
+        # Fecha de finalización
+        fecha_str = ""
+        if subasta.fecha_conclusion:
+            fecha_str = f" Finaliza {subasta.fecha_conclusion.strftime('%d/%m/%Y')}."
+
+        # Construir descripción (máx 160 chars)
+        descripcion = f"Subasta judicial de {tipo} en {ubicacion}. Valor: {precio_str}.{fecha_str} Asesoramiento legal gratuito."
+
+        # Truncar si excede 160 caracteres
+        if len(descripcion) > 160:
+            descripcion = descripcion[:157] + "..."
+
+        return descripcion
+
+    def _generate_schema_markup(self, subasta: Subasta) -> str:
+        """
+        Genera Schema.org JSON-LD para rich snippets en Google.
+
+        Usa el tipo "Product" con "Offer" para mostrar precio en resultados.
+        También incluye "RealEstateListing" para contexto inmobiliario.
+        """
+        import json
+
+        bien = subasta.get_bien_principal()
+
+        # Datos básicos
+        tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "Inmueble"
+        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
+        provincia = bien.provincia if bien and bien.provincia else "Andalucía"
+        direccion = bien.direccion if bien and bien.direccion else ""
+        codigo_postal = bien.codigo_postal if bien and bien.codigo_postal else ""
+
+        # Precio
+        precio = float(subasta.valor_subasta) if subasta.valor_subasta else 0
+
+        # Fecha disponibilidad (fecha conclusión)
+        fecha_disponible = ""
+        if subasta.fecha_conclusion:
+            fecha_disponible = subasta.fecha_conclusion.strftime("%Y-%m-%d")
+
+        # Schema principal: RealEstateListing
+        schema = {
+            "@context": "https://schema.org",
+            "@type": "RealEstateListing",
+            "name": f"Subasta {tipo} en {localidad}",
+            "description": self._generate_meta_description(subasta),
+            "url": subasta.url_detalle or f"https://subastas.boe.es/detalleSubasta.php?idSub={subasta.id_subasta}",
+            "datePosted": subasta.fecha_inicio.strftime("%Y-%m-%d") if subasta.fecha_inicio else "",
+            "offers": {
+                "@type": "Offer",
+                "price": precio,
+                "priceCurrency": "EUR",
+                "availability": "https://schema.org/InStock",
+                "validThrough": fecha_disponible,
+                "seller": {
+                    "@type": "Organization",
+                    "name": subasta.autoridad_gestora or "Portal de Subastas BOE",
+                }
+            }
+        }
+
+        # Añadir ubicación si hay datos
+        if direccion or localidad:
+            schema["contentLocation"] = {
+                "@type": "Place",
+                "address": {
+                    "@type": "PostalAddress",
+                    "streetAddress": direccion,
+                    "addressLocality": localidad,
+                    "addressRegion": provincia,
+                    "postalCode": codigo_postal,
+                    "addressCountry": "ES"
+                }
+            }
+
+        # Schema secundario: Organization (para el despacho)
+        org_schema = {
+            "@context": "https://schema.org",
+            "@type": "LegalService",
+            "name": "Comprar en Subasta - Asesoramiento Legal",
+            "description": "Despacho de abogados especializado en subastas judiciales e inmobiliarias en Andalucía",
+            "url": "https://comprarensubasta.com",
+            "areaServed": {
+                "@type": "State",
+                "name": "Andalucía"
+            },
+            "serviceType": ["Asesoramiento legal en subastas", "Gestión de pujas", "Análisis de cargas"]
+        }
+
+        # Combinar ambos schemas
+        return f'''<script type="application/ld+json">
+{json.dumps(schema, ensure_ascii=False, indent=2)}
+</script>
+<script type="application/ld+json">
+{json.dumps(org_schema, ensure_ascii=False, indent=2)}
+</script>'''
+
+    def _generate_faq_schema(self, subasta: Subasta) -> str:
+        """
+        Genera FAQ Schema JSON-LD para mejorar visibilidad en Google y respuestas de IAs.
+
+        Las preguntas frecuentes se generan dinámicamente basadas en los datos de la subasta.
+        Esto ayuda tanto a Google (rich snippets FAQ) como a IAs (ChatGPT, Perplexity, etc.)
+        """
+        import json
+
+        bien = subasta.get_bien_principal()
+
+        # Datos para personalizar las FAQs
+        tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
+        localidad = bien.localidad if bien and bien.localidad else "esta ubicación"
+        provincia = bien.provincia if bien and bien.provincia else "España"
+
+        # Formatear precio
+        precio_str = "consultar en la documentación"
+        if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
+            precio = float(subasta.valor_subasta)
+            precio_str = f"{precio:,.0f}€".replace(",", ".")
+
+        # Formatear depósito
+        deposito_str = "el 5% del valor de subasta"
+        if subasta.importe_deposito and float(subasta.importe_deposito) > 0:
+            deposito = float(subasta.importe_deposito)
+            deposito_str = f"{deposito:,.0f}€".replace(",", ".")
+
+        # Formatear fecha
+        fecha_str = "consultar en el BOE"
+        if subasta.fecha_conclusion:
+            fecha_str = subasta.fecha_conclusion.strftime("%d/%m/%Y a las %H:%M")
+
+        # Generar FAQs dinámicas
+        faqs = [
+            {
+                "@type": "Question",
+                "name": f"¿Cuál es el valor de salida de esta subasta de {tipo} en {localidad}?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": f"El valor de salida de esta subasta es de {precio_str}. Este es el precio mínimo desde el que pueden comenzar las pujas. Recuerda que en subastas judiciales puedes adquirir inmuebles por debajo del valor de mercado."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": f"¿Cuánto depósito necesito para participar en esta subasta?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": f"Para participar en esta subasta necesitas depositar {deposito_str}. Este depósito se realiza a través del Portal de Subastas del BOE y se devuelve si no resultas adjudicatario."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": f"¿Hasta cuándo puedo pujar en esta subasta?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": f"Esta subasta finaliza el {fecha_str}. Te recomendamos registrarte con antelación en el Portal de Subastas del BOE y tener preparada la documentación necesaria."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "¿Qué documentación necesito para participar en una subasta judicial?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Para participar necesitas: DNI/NIE vigente, certificado digital o Cl@ve, cuenta bancaria para el depósito, y estar dado de alta en el Portal de Subastas del BOE. Recomendamos también revisar el edicto y la certificación de cargas antes de pujar."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": f"¿Es seguro comprar un {tipo} en subasta judicial?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": f"Sí, las subastas judiciales son procedimientos legales supervisados por juzgados. Sin embargo, es fundamental analizar las cargas registrales y la situación posesoria antes de pujar. Te recomendamos contar con asesoramiento legal especializado para evitar sorpresas."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "¿Qué pasa si gano la subasta? ¿Cuáles son los siguientes pasos?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Si ganas la subasta, deberás pagar el resto del precio en el plazo establecido (normalmente 20 días hábiles), liquidar los impuestos correspondientes (ITP o IVA), y esperar el Decreto de Adjudicación para inscribir la propiedad en el Registro. Un abogado especializado puede gestionar todo el proceso."
+                }
+            }
+        ]
+
+        faq_schema = {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": faqs
+        }
+
+        return f'''<script type="application/ld+json">
+{json.dumps(faq_schema, ensure_ascii=False, indent=2)}
+</script>'''
+
+    def _generate_faq_html(self, subasta: Subasta) -> str:
+        """
+        Genera el HTML visible de las FAQs para el contenido del post.
+
+        Este contenido complementa el FAQ Schema y mejora la experiencia del usuario.
+        """
+        bien = subasta.get_bien_principal()
+
+        tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
+        localidad = bien.localidad if bien and bien.localidad else "esta ubicación"
+
+        # Formatear precio
+        precio_str = "consultar en la documentación"
+        if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
+            precio = float(subasta.valor_subasta)
+            precio_str = f"{precio:,.0f}€".replace(",", ".")
+
+        # Formatear depósito
+        deposito_str = "el 5% del valor de subasta"
+        if subasta.importe_deposito and float(subasta.importe_deposito) > 0:
+            deposito = float(subasta.importe_deposito)
+            deposito_str = f"{deposito:,.0f}€".replace(",", ".")
+
+        # Formatear fecha
+        fecha_str = "consultar en el BOE"
+        if subasta.fecha_conclusion:
+            fecha_str = subasta.fecha_conclusion.strftime("%d/%m/%Y a las %H:%M")
+
+        return f'''
+    <!-- FAQ Section - Optimizado para Google e IAs -->
+    <div class="subasta-faq">
+        <h2>Preguntas Frecuentes sobre esta Subasta</h2>
+
+        <div class="faq-item">
+            <h3>¿Cuál es el valor de salida de esta subasta de {tipo} en {localidad}?</h3>
+            <p>El valor de salida de esta subasta es de <strong>{precio_str}</strong>. Este es el precio mínimo desde el que pueden comenzar las pujas.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>¿Cuánto depósito necesito para participar?</h3>
+            <p>Para participar necesitas depositar <strong>{deposito_str}</strong>. Este depósito se realiza a través del Portal de Subastas del BOE.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>¿Hasta cuándo puedo pujar?</h3>
+            <p>Esta subasta finaliza el <strong>{fecha_str}</strong>. Regístrate con antelación en el Portal de Subastas del BOE.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>¿Qué documentación necesito?</h3>
+            <p>Necesitas DNI/NIE vigente, certificado digital o Cl@ve, y estar dado de alta en el Portal de Subastas del BOE.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>¿Es seguro comprar en subasta judicial?</h3>
+            <p>Sí, son procedimientos legales supervisados por juzgados. Recomendamos analizar las cargas y contar con asesoramiento legal.</p>
+        </div>
+    </div>
+'''
 
     def _generate_content(self, subasta: Subasta) -> str:
-        """Genera el contenido HTML del post."""
+        """
+        Genera el contenido HTML SEO-optimizado del post.
+
+        Incluye:
+        - Schema.org JSON-LD para rich snippets
+        - Estructura semántica con H2/H3
+        - Palabras clave naturales en el contenido
+        - CTA optimizado
+        """
         bien = subasta.get_bien_principal()
 
         # Formatear valores monetarios
@@ -111,7 +423,131 @@ class WordPressPublisher:
         estado_class = "en-curso" if "celebr" in subasta.estado.lower() else "proxima"
         estado_texto = subasta.estado or "En curso"
 
-        html = f"""
+        # Datos para SEO contextual
+        tipo_bien = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
+        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
+        provincia = bien.provincia if bien and bien.provincia else "Andalucía"
+
+        # Schema markup JSON-LD (RealEstateListing + Organization)
+        schema_markup = self._generate_schema_markup(subasta)
+
+        # FAQ Schema JSON-LD (para Google e IAs)
+        faq_schema = self._generate_faq_schema(subasta)
+
+        # Estilos CSS para múltiples lotes y mapa
+        css_styles = """
+<style>
+/* Estilos para múltiples lotes */
+.subasta-alerta.multi-lotes {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    text-align: center;
+}
+.subasta-alerta.multi-lotes strong {
+    font-size: 1.3em;
+    display: block;
+    margin-bottom: 8px;
+}
+.subasta-alerta.multi-lotes p {
+    margin: 0;
+    opacity: 0.9;
+}
+.bien-lote {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    background: #fafafa;
+}
+.bien-lote h2 {
+    color: #1e40af;
+    border-bottom: 2px solid #3b82f6;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+/* Estilos para el mapa */
+.mapa-ubicacion {
+    margin-top: 25px;
+    padding: 20px;
+    background: #f0f9ff;
+    border-radius: 10px;
+    border: 1px solid #bae6fd;
+}
+.mapa-ubicacion h3 {
+    color: #0369a1;
+    margin-bottom: 15px;
+}
+.mapa-container {
+    margin-bottom: 15px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.mapa-direccion {
+    color: #475569;
+    font-size: 0.95em;
+    margin-bottom: 15px;
+}
+.btn-mapa {
+    display: inline-block;
+    background: #0284c7;
+    color: white !important;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+.btn-mapa:hover {
+    background: #0369a1;
+    color: white !important;
+}
+
+/* Estilos para valores económicos del lote */
+.valores-lote {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.valores-lote h3 {
+    color: #92400e;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+.tabla-valores-lote {
+    width: 100%;
+    border-collapse: collapse;
+}
+.tabla-valores-lote th {
+    text-align: left;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.5);
+    border-bottom: 1px solid #f59e0b;
+    color: #78350f;
+    font-weight: 500;
+    width: 40%;
+}
+.tabla-valores-lote td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(245,158,11,0.3);
+    color: #1f2937;
+}
+.tabla-valores-lote .precio {
+    color: #b45309;
+    font-size: 1.1em;
+}
+</style>
+"""
+
+        html = f"""{schema_markup}
+{faq_schema}
+{css_styles}
 <div class="subasta-detalle">
 
     <!-- Alerta de Estado -->
@@ -120,9 +556,12 @@ class WordPressPublisher:
         {f' - Finaliza: {format_date(subasta.fecha_conclusion)}' if subasta.fecha_conclusion else ''}
     </div>
 
-    <!-- Información General -->
+    <!-- Información General - H2 con palabra clave -->
     <div class="subasta-seccion">
-        <h2>📋 Información de la Subasta</h2>
+        <h2>Detalles de la Subasta Judicial en {localidad}</h2>
+        <p class="intro-seo">Esta <strong>subasta de {tipo_bien}</strong> en <strong>{localidad}</strong> ({provincia})
+        está disponible a través del <strong>Portal de Subastas del BOE</strong>.
+        Consulta todos los detalles y solicita asesoramiento legal gratuito.</p>
         <table class="tabla-subasta">
             <tr>
                 <th>Identificador</th>
@@ -164,12 +603,61 @@ class WordPressPublisher:
     </div>
 """
 
-        # Sección de bienes
-        if bien:
-            html += f"""
-    <!-- Datos del Inmueble -->
-    <div class="subasta-seccion">
-        <h2>🏠 Datos del Inmueble</h2>
+        # Sección de bienes - TODOS los lotes
+        num_bienes = len(subasta.bienes)
+
+        if num_bienes > 0:
+            # Si hay múltiples lotes, mostrar encabezado especial
+            if num_bienes > 1:
+                html += f"""
+    <!-- Aviso de múltiples lotes -->
+    <div class="subasta-alerta multi-lotes">
+        <strong>📦 Esta subasta incluye {num_bienes} LOTES</strong>
+        <p>A continuación se detallan todos los bienes incluidos en esta subasta.</p>
+    </div>
+"""
+
+            # Iterar sobre TODOS los bienes
+            for idx, bien in enumerate(subasta.bienes, 1):
+                lote_titulo = f"LOTE {idx}: " if num_bienes > 1 else ""
+
+                # Valores económicos del lote (si hay múltiples lotes)
+                valores_lote_html = ""
+                if num_bienes > 1 and (bien.valor_subasta_lote > 0 or bien.importe_deposito_lote > 0):
+                    valores_lote_html = f"""
+        <!-- Valores económicos del lote -->
+        <div class="valores-lote">
+            <h3>💰 Valores Económicos del Lote {idx}</h3>
+            <table class="tabla-valores-lote">
+                <tr>
+                    <th>Valor Subasta</th>
+                    <td><strong class="precio">{format_money(bien.valor_subasta_lote)}</strong></td>
+                </tr>
+                <tr>
+                    <th>Tasación</th>
+                    <td>{format_money(bien.valor_tasacion)}</td>
+                </tr>
+                <tr>
+                    <th>Depósito Requerido</th>
+                    <td>{format_money(bien.importe_deposito_lote)}</td>
+                </tr>
+                <tr>
+                    <th>Puja Mínima</th>
+                    <td>{format_money(bien.puja_minima_lote) if bien.puja_minima_lote > 0 else 'Sin puja mínima'}</td>
+                </tr>
+                <tr>
+                    <th>Tramos entre Pujas</th>
+                    <td>{format_money(bien.tramos_pujas_lote)}</td>
+                </tr>
+            </table>
+        </div>
+"""
+
+                html += f"""
+    <!-- Datos del Inmueble {idx} - H2 con contexto geográfico -->
+    <div class="subasta-seccion bien-lote" id="lote-{idx}">
+        <h2>{lote_titulo}Datos del {bien.subtipo_bien or 'Inmueble'} en {bien.localidad or 'Venta'}</h2>
+{valores_lote_html}
         <table class="tabla-bien">
             <tr>
                 <th>Tipo de Bien</th>
@@ -201,28 +689,66 @@ class WordPressPublisher:
             </tr>
         </table>
 """
-            if bien.descripcion:
-                html += f"""
+                # Mapa de Google Maps si hay dirección
+                if bien.direccion and bien.localidad:
+                    direccion_completa = f"{bien.direccion}, {bien.localidad}"
+                    if bien.provincia:
+                        direccion_completa += f", {bien.provincia}"
+                    if bien.codigo_postal:
+                        direccion_completa += f", {bien.codigo_postal}"
+                    direccion_completa += ", España"
+
+                    # Codificar dirección para URL
+                    import urllib.parse
+                    direccion_encoded = urllib.parse.quote(direccion_completa)
+
+                    html += f"""
+        <!-- Mapa de ubicación -->
+        <div class="mapa-ubicacion">
+            <h3>📍 Ubicación del Inmueble</h3>
+            <div class="mapa-container">
+                <iframe
+                    src="https://www.google.com/maps?q={direccion_encoded}&output=embed"
+                    width="100%"
+                    height="350"
+                    style="border:0; border-radius: 8px;"
+                    allowfullscreen=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade">
+                </iframe>
+            </div>
+            <p class="mapa-direccion"><strong>Dirección:</strong> {direccion_completa}</p>
+            <a href="https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+               target="_blank"
+               rel="nofollow"
+               class="btn-mapa">
+                🗺️ Ver en Google Maps
+            </a>
+        </div>
+"""
+
+                if bien.descripcion:
+                    html += f"""
         <div class="descripcion-bien">
             <h3>Descripción</h3>
             <p>{bien.descripcion}</p>
         </div>
 """
 
-            if bien.cargas:
-                html += f"""
+                if bien.cargas:
+                    html += f"""
         <div class="cargas-bien">
             <h3>⚠️ Cargas</h3>
             <p>{bien.cargas}</p>
         </div>
 """
-            html += "    </div>\n"
+                html += "    </div>\n"
 
         # Documentos
         html += """
-    <!-- Documentos -->
+    <!-- Documentos - Importante para confianza -->
     <div class="subasta-seccion">
-        <h2>📄 Documentos</h2>
+        <h2>Documentos Oficiales de la Subasta</h2>
         <ul class="lista-documentos">
 """
         if subasta.url_edicto:
@@ -235,7 +761,7 @@ class WordPressPublisher:
 
     <!-- Autoridad Gestora -->
     <div class="subasta-seccion">
-        <h2>⚖️ Autoridad Gestora</h2>
+        <h2>Juzgado Responsable de la Subasta</h2>
         <p><strong>{subasta.autoridad_gestora or 'Juzgado'}</strong></p>
         <p>Localidad: {subasta.localidad_juzgado or 'No especificada'}</p>
 """
@@ -246,20 +772,25 @@ class WordPressPublisher:
 
         html += "    </div>\n"
 
+        # FAQ Section (HTML visible + mejora SEO)
+        html += self._generate_faq_html(subasta)
+
         # CTA - Llamada a la acción
         html += f"""
-    <!-- CTA -->
+    <!-- CTA - Optimizado para conversión -->
     <div class="subasta-cta">
-        <h2>¿Interesado en esta subasta?</h2>
-        <p>Nuestro equipo de abogados especializados puede ayudarte con todo el proceso:</p>
+        <h2>Asesoramiento Legal para Subastas en {provincia}</h2>
+        <p>¿Quieres <strong>participar en esta subasta judicial</strong>? Nuestro equipo de
+        <strong>abogados especializados en subastas</strong> te ayuda con todo el proceso:</p>
         <ul>
-            <li>✅ Análisis de la documentación</li>
-            <li>✅ Verificación de cargas</li>
-            <li>✅ Asesoramiento legal completo</li>
-            <li>✅ Gestión de la puja</li>
+            <li>Análisis completo de la documentación y cargas registrales</li>
+            <li>Verificación del estado real del inmueble</li>
+            <li>Asesoramiento legal durante todo el proceso de puja</li>
+            <li>Gestión post-adjudicación y escrituración</li>
         </ul>
-        <a href="{self.contact_url}" class="btn-cta">
-            📞 Solicitar Análisis Gratuito
+        <p><strong>Primera consulta gratuita</strong> - Te explicamos si esta subasta es una buena oportunidad.</p>
+        <a href="{self.contact_url}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
+            Solicitar Análisis Gratuito
         </a>
     </div>
 
@@ -344,10 +875,33 @@ class WordPressPublisher:
         return tags
 
     def _generate_meta(self, subasta: Subasta) -> dict:
-        """Genera los campos meta para el post."""
+        """
+        Genera los campos meta para el post, incluyendo SEO.
+
+        Incluye campos para:
+        - Datos internos de la subasta
+        - SEO (Yoast/Rank Math compatible)
+        - Open Graph para redes sociales
+        - Información de múltiples lotes
+        """
         bien = subasta.get_bien_principal()
 
+        # Meta description SEO
+        meta_description = self._generate_meta_description(subasta)
+
+        # Título SEO (puede ser ligeramente diferente al título del post)
+        tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "Inmueble"
+        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
+        provincia = bien.provincia if bien and bien.provincia else ""
+
+        # Focus keyword para SEO
+        focus_keyword = f"subasta {tipo.lower()} {localidad.lower()}"
+
+        # Número de lotes
+        num_lotes = len(subasta.bienes)
+
         meta = {
+            # Datos internos de la subasta
             "_subasta_id": subasta.id_subasta,
             "_subasta_tipo": subasta.tipo_subasta or "",
             "_subasta_estado": subasta.estado or "",
@@ -355,6 +909,18 @@ class WordPressPublisher:
             "_subasta_deposito": str(subasta.importe_deposito),
             "_subasta_fecha_inicio": subasta.fecha_inicio.isoformat() if subasta.fecha_inicio else "",
             "_subasta_fecha_fin": subasta.fecha_conclusion.isoformat() if subasta.fecha_conclusion else "",
+            "_subasta_num_lotes": str(num_lotes),
+
+            # SEO - Yoast compatible
+            "_yoast_wpseo_metadesc": meta_description,
+            "_yoast_wpseo_focuskw": focus_keyword,
+
+            # SEO - Rank Math compatible
+            "rank_math_description": meta_description,
+            "rank_math_focus_keyword": focus_keyword,
+
+            # Open Graph para redes sociales
+            "_yoast_wpseo_opengraph-description": meta_description,
         }
 
         if bien:
@@ -365,6 +931,13 @@ class WordPressPublisher:
                 "_bien_provincia": bien.provincia or "",
                 "_bien_cp": bien.codigo_postal or "",
             })
+
+        # Si hay múltiples lotes, agregar resumen de tipos
+        if num_lotes > 1:
+            tipos_lotes = [b.subtipo_bien or b.tipo_bien or "Inmueble" for b in subasta.bienes]
+            meta["_bien_tipo"] = f"{num_lotes} lotes: " + ", ".join(tipos_lotes[:3])
+            if num_lotes > 3:
+                meta["_bien_tipo"] += f" (+{num_lotes - 3} más)"
 
         return meta
 
