@@ -726,10 +726,16 @@ class WordPressPublisher:
                         d = re.sub(r'(Nº|nº|N\.|n\.|Num\.?|núm\.?)(\d)', r'\1 \2', d)
 
                         # 4. Eliminar detalles de planta/puerta/portal/local que confunden a Maps
+                        # Incluye patrones como 'PL 2ª -69', 'PISO 3', 'PTA 4', etc.
                         patrones_eliminar = [
+                            r'\s+PL\s*\d+[ªº]?\s*[-]?\s*\d*',  # PL 2ª -69, PL 3
+                            r'\s+PISO\s*\d+[ªº]?\s*[-]?\s*\w*',  # PISO 2 -4, PISO 3º B
+                            r'\s+PTA\.?\s*\d+',  # PTA 4, PTA. 5
+                            r'\s+PUERTA\s*\d+',  # PUERTA 3
                             r',?\s*(?:planta|piso|pta|puerta|pto|portal|local|bajo|entreplanta|ent|escalera|esc)\s*[^,]*',
-                            r',?\s*\d+º\s*[A-Za-z]?\s*$',  # "2º A" al final
+                            r',?\s*\d+[ªº]\s*[A-Za-z]?\s*$',  # '2ª A' al final
                             r',?\s*(?:bloque|blq|edificio|edif)\s*[^,]*',
+                            r'\s*-\s*\d+\s*$',  # ' -69' al final (número de puerta)
                         ]
                         for patron in patrones_eliminar:
                             d = re.sub(patron, '', d, flags=re.IGNORECASE)
