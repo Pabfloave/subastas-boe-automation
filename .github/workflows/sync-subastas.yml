@@ -17,13 +17,14 @@ on:
           - 'false'
           - 'true'
       limit:
-        description: 'Límite de subastas por provincia (dejar vacío para sin límite)'
+        description: 'Límite de subastas por provincia (0 = sin límite)'
         required: false
-        default: '20'
+        default: '50'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 horas máximo para todo el job
 
     steps:
       - name: Checkout código
@@ -76,14 +77,20 @@ jobs:
             echo "🔄 Modo FORCE activado - Se actualizarán todas las subastas"
           fi
 
+          # Límite por defecto: 50 para ejecuciones programadas, configurable para manuales
+          LIMIT="${{ github.event.inputs.limit }}"
+          if [ -z "$LIMIT" ]; then
+            LIMIT="50"
+          fi
+
           LIMIT_FLAG=""
-          if [ -n "${{ github.event.inputs.limit }}" ] && [ "${{ github.event.inputs.limit }}" != "" ]; then
-            LIMIT_FLAG="--limit ${{ github.event.inputs.limit }}"
+          if [ "$LIMIT" != "0" ]; then
+            LIMIT_FLAG="--limit $LIMIT"
           fi
 
           echo "Ejecutando: python cli.py sync $FORCE_FLAG $LIMIT_FLAG"
           python cli.py sync $FORCE_FLAG $LIMIT_FLAG
-        timeout-minutes: 60
+        timeout-minutes: 150
 
       - name: Limpiar subastas finalizadas/canceladas
         run: |
