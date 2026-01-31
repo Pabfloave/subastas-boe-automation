@@ -99,6 +99,12 @@ def run_sync(
     results = {}
     total_stats = SyncStats()
 
+    # Cargar IDs existentes en memoria para búsqueda rápida O(1)
+    ids_existentes = set()
+    if db and not force:
+        ids_existentes = db.get_ids_existentes()
+        logger.info(f"Cargados {len(ids_existentes)} IDs existentes en caché")
+
     try:
         with BOEScraper(headless=settings.SELENIUM_HEADLESS) as scraper:
             for cod_provincia, data_provincia in provincias.items():
@@ -127,8 +133,8 @@ def run_sync(
                             continue
 
                         try:
-                            # Verificar si existe
-                            existe = db.subasta_existe(id_subasta) if db else False
+                            # Verificar si existe usando caché en memoria (O(1))
+                            existe = id_subasta in ids_existentes if not force else False
 
                             if existe and not force:
                                 # Verificar si hay cambios
@@ -155,6 +161,8 @@ def run_sync(
                                 else:
                                     db.insert_subasta(subasta)
                                     stats.nuevas += 1
+                                    # Añadir al caché para evitar duplicados en la misma ejecución
+                                    ids_existentes.add(id_subasta)
                                     logger.info(f"Nueva subasta: {id_subasta}")
 
                                 # Publicar en WordPress

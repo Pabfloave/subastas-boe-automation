@@ -1,30 +1,26 @@
-name: Sincronizar Subastas BOE
+name: Limpiar Subastas Finalizadas
 
 on:
-  # Ejecutar cada 6 horas
+  # Ejecutar una vez al día a las 04:00 UTC
   schedule:
-    - cron: '0 0,6,12,18 * * *'
+    - cron: '0 4 * * *'
 
-  # Permitir ejecución manual con opciones
+  # Permitir ejecución manual
   workflow_dispatch:
     inputs:
-      force_update:
-        description: 'Forzar actualización de todas las subastas'
+      dry_run:
+        description: 'Modo simulación (no hace cambios reales)'
         required: false
         default: 'false'
         type: choice
         options:
           - 'false'
           - 'true'
-      limit:
-        description: 'Límite de subastas por provincia (0 = sin límite)'
-        required: false
-        default: '50'
 
 jobs:
-  sync:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 180  # 3 horas máximo para todo el job
+    timeout-minutes: 60
 
     steps:
       - name: Checkout código
@@ -66,40 +62,41 @@ jobs:
           PROVINCIAS=01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
           EOF
 
-      - name: Crear directorio de datos
+      - name: Crear directorios
         run: mkdir -p data logs
 
-      - name: Ejecutar sincronización
+      - name: Descargar base de datos
+        uses: actions/download-artifact@v4
+        with:
+          name: subastas-db
+          path: data/
+        continue-on-error: true
+
+      - name: Ejecutar limpieza
         run: |
-          FORCE_FLAG=""
-          if [ "${{ github.event.inputs.force_update }}" = "true" ]; then
-            FORCE_FLAG="--force"
-            echo "🔄 Modo FORCE activado - Se actualizarán todas las subastas"
+          echo "🧹 Iniciando limpieza de subastas finalizadas/canceladas"
+          echo "⏰ Hora UTC: $(date -u)"
+          echo "=============================================="
+
+          DRY_RUN_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+            echo "⚠️ MODO DRY-RUN: No se realizarán cambios reales"
           fi
 
-          # Límite por defecto: 50 para ejecuciones programadas, configurable para manuales
-          LIMIT="${{ github.event.inputs.limit }}"
-          if [ -z "$LIMIT" ]; then
-            LIMIT="50"
-          fi
+          python cli.py cleanup $DRY_RUN_FLAG
+        timeout-minutes: 45
 
-          LIMIT_FLAG=""
-          if [ "$LIMIT" != "0" ]; then
-            LIMIT_FLAG="--limit $LIMIT"
-          fi
-
-          echo "Ejecutando: python cli.py sync $FORCE_FLAG $LIMIT_FLAG"
-          python cli.py sync $FORCE_FLAG $LIMIT_FLAG
-        timeout-minutes: 150
-
-      - name: Limpiar subastas finalizadas/canceladas
-        run: |
-          echo "🧹 Verificando y despublicando subastas finalizadas o canceladas..."
-          python cli.py cleanup
-        timeout-minutes: 30
+      - name: Guardar base de datos
+        uses: actions/upload-artifact@v4
+        with:
+          name: subastas-db
+          path: data/subastas.db
+          retention-days: 90
+        if: always()
 
       - name: Mostrar logs
         if: always()
         run: |
-          echo "=== Logs de sincronización ==="
+          echo "=== Logs de limpieza ==="
           cat logs/*.log 2>/dev/null || echo "No hay logs"

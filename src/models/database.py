@@ -489,6 +489,15 @@ class Database:
         cursor.execute("SELECT 1 FROM subastas WHERE id_subasta = ?", (id_subasta,))
         return cursor.fetchone() is not None
 
+    def get_ids_existentes(self) -> set:
+        """
+        Retorna un set con todos los IDs de subastas existentes.
+        Útil para verificación rápida en memoria durante sincronización.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id_subasta FROM subastas")
+        return {row[0] for row in cursor.fetchall()}
+
     def subasta_cambio(self, id_subasta: str, nuevo_hash: str) -> bool:
         """Verifica si una subasta ha cambiado comparando hashes."""
         cursor = self.conn.cursor()

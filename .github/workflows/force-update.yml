@@ -1,0 +1,137 @@
+name: Actualización Forzada de Subastas
+
+# Este workflow es SOLO para ejecución manual
+# Úsalo cuando necesites actualizar todas las subastas existentes
+# (por ejemplo, después de cambios en el software)
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Forzar actualización de TODAS las subastas (re-extraer datos del BOE)'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      provincias:
+        description: 'Provincias a procesar (ej: 41,29,18 o "todas")'
+        required: false
+        default: 'todas'
+      limit:
+        description: 'Límite de subastas por provincia (0 = sin límite)'
+        required: false
+        default: '0'
+
+jobs:
+  force-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300  # 5 horas máximo para actualización completa
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Determinar provincias
+        id: config
+        run: |
+          INPUT_PROVINCIAS="${{ github.event.inputs.provincias }}"
+
+          if [ "$INPUT_PROVINCIAS" = "todas" ] || [ -z "$INPUT_PROVINCIAS" ]; then
+            PROVINCIAS="01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52"
+          else
+            PROVINCIAS="$INPUT_PROVINCIAS"
+          fi
+
+          echo "PROVINCIAS=$PROVINCIAS" >> $GITHUB_OUTPUT
+          echo "📍 Provincias a procesar: $PROVINCIAS"
+
+      - name: Crear archivo .env
+        run: |
+          cat > .env << EOF
+          WP_URL=${{ secrets.WP_URL }}
+          WP_USER=${{ secrets.WP_USER }}
+          WP_APP_PASSWORD=${{ secrets.WP_APP_PASSWORD }}
+          WP_CONTACT_FORM_URL=${{ secrets.WP_CONTACT_FORM_URL }}
+          WP_POST_STATUS=publish
+          DB_PATH=./data/subastas.db
+          SELENIUM_HEADLESS=true
+          REQUEST_TIMEOUT=30
+          DELAY_BETWEEN_REQUESTS=2
+          MAX_RETRIES=3
+          PAGE_LOAD_TIMEOUT=60
+          LOG_LEVEL=INFO
+          LOG_MAX_SIZE_MB=10
+          LOG_BACKUP_COUNT=5
+          PROVINCIAS=${{ steps.config.outputs.PROVINCIAS }}
+          EOF
+
+      - name: Crear directorios
+        run: mkdir -p data logs
+
+      - name: Descargar base de datos
+        uses: actions/download-artifact@v4
+        with:
+          name: subastas-db
+          path: data/
+        continue-on-error: true
+
+      - name: Ejecutar actualización forzada
+        run: |
+          echo "🔄 ACTUALIZACIÓN FORZADA DE SUBASTAS"
+          echo "=============================================="
+          echo "⏰ Inicio: $(date -u)"
+          echo "📍 Provincias: ${{ steps.config.outputs.PROVINCIAS }}"
+          echo "🔄 Force update: ${{ github.event.inputs.force_update }}"
+          echo "📊 Límite: ${{ github.event.inputs.limit }}"
+          echo "=============================================="
+
+          FORCE_FLAG=""
+          if [ "${{ github.event.inputs.force_update }}" = "true" ]; then
+            FORCE_FLAG="--force"
+            echo "⚠️ MODO FORCE ACTIVADO - Se re-extraerán y actualizarán TODAS las subastas"
+          fi
+
+          LIMIT="${{ github.event.inputs.limit }}"
+          LIMIT_FLAG=""
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then
+            LIMIT_FLAG="--limit $LIMIT"
+          fi
+
+          echo ""
+          echo "Ejecutando: python cli.py sync $FORCE_FLAG $LIMIT_FLAG"
+          python cli.py sync $FORCE_FLAG $LIMIT_FLAG
+        timeout-minutes: 270
+
+      - name: Guardar base de datos
+        uses: actions/upload-artifact@v4
+        with:
+          name: subastas-db
+          path: data/subastas.db
+          retention-days: 90
+        if: always()
+
+      - name: Mostrar logs
+        if: always()
+        run: |
+          echo "=== Logs de actualización forzada ==="
+          cat logs/*.log 2>/dev/null || echo "No hay logs"
+          echo ""
+          echo "⏰ Fin: $(date -u)"
