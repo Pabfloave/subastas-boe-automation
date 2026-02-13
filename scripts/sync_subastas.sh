@@ -5,7 +5,7 @@
 # ═══════════════════════════════════════════════════════════════
 
 # Configuración
-PROJECT_DIR="/Users/pablofloresavellaneda/subastas-boe-automation"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/sync_$(date +%Y%m%d).log"
 
