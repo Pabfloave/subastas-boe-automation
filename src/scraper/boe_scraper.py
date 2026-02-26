@@ -101,7 +101,7 @@ class BOEScraper:
         provincia: str,
         tipo_bien: str = "I",
         estado: str = "EJ",
-        max_paginas: int = 10
+        max_paginas: int = 100
     ) -> Generator[Dict, None, None]:
         """
         Busca subastas por provincia y otros criterios.

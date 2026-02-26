@@ -3,6 +3,7 @@ Publicador de subastas en WordPress.
 Genera contenido HTML y publica posts usando el cliente WordPress.
 """
 import logging
+import urllib.parse
 from typing import List, Optional
 from datetime import datetime
 
@@ -84,7 +85,7 @@ class WordPressPublisher:
         Genera el título SEO-optimizado del post.
 
         Formato: "Subasta [Tipo] en [Localidad] desde [Precio] - [Provincia]"
-        Ejemplo: "Subasta Piso en Sevilla desde 45.000€ - Andalucía"
+        Ejemplo: "Subasta Piso en Sevilla desde 45.000€ - Sevilla"
         """
         bien = subasta.get_bien_principal()
 
@@ -94,7 +95,7 @@ class WordPressPublisher:
             tipo = bien.subtipo_bien.title()
 
         # Localidad
-        localidad = "Andalucía"
+        localidad = "España"
         if bien and bien.localidad:
             localidad = bien.localidad.title()
 
@@ -129,7 +130,7 @@ class WordPressPublisher:
             tipo = bien.subtipo_bien.lower()
 
         # Ubicación
-        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
+        localidad = bien.localidad if bien and bien.localidad else "España"
         provincia = bien.provincia if bien and bien.provincia else ""
 
         ubicacion = localidad
@@ -169,8 +170,8 @@ class WordPressPublisher:
 
         # Datos básicos
         tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "Inmueble"
-        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
-        provincia = bien.provincia if bien and bien.provincia else "Andalucía"
+        localidad = bien.localidad if bien and bien.localidad else "España"
+        provincia = bien.provincia if bien and bien.provincia else "España"
         direccion = bien.direccion if bien and bien.direccion else ""
         codigo_postal = bien.codigo_postal if bien and bien.codigo_postal else ""
 
@@ -221,14 +222,14 @@ class WordPressPublisher:
         org_schema = {
             "@context": "https://schema.org",
             "@type": "LegalService",
-            "name": "Comprar en Subasta - Asesoramiento Legal",
-            "description": "Despacho de abogados especializado en subastas judiciales e inmobiliarias en Andalucía",
+            "name": "CAFAVE INVESTMENT - Comprar en Subasta",
+            "description": "Asesoramiento legal especializado en subastas judiciales e inmobiliarias en España",
             "url": "https://comprarensubasta.com",
             "areaServed": {
-                "@type": "State",
-                "name": "Andalucía"
+                "@type": "Country",
+                "name": "España"
             },
-            "serviceType": ["Asesoramiento legal en subastas", "Gestión de pujas", "Análisis de cargas"]
+            "serviceType": ["Asesoramiento legal en subastas", "Gestión de pujas", "Análisis de cargas registrales", "Mandatos de compra en subasta"]
         }
 
         # Combinar ambos schemas
@@ -425,8 +426,8 @@ class WordPressPublisher:
 
         # Datos para SEO contextual
         tipo_bien = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
-        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
-        provincia = bien.provincia if bien and bien.provincia else "Andalucía"
+        localidad = bien.localidad if bien and bien.localidad else "España"
+        provincia = bien.provincia if bien and bien.provincia else "España"
 
         # Schema markup JSON-LD (RealEstateListing + Organization)
         schema_markup = self._generate_schema_markup(subasta)
@@ -673,7 +674,7 @@ class WordPressPublisher:
             </tr>
             <tr>
                 <th>Provincia</th>
-                <td>{bien.provincia or 'Andalucía'}</td>
+                <td>{bien.provincia or 'España'}</td>
             </tr>
             <tr>
                 <th>Código Postal</th>
@@ -732,8 +733,9 @@ class WordPressPublisher:
                             r'\s+PISO\s*\d+[ªº]?\s*[-]?\s*\w*',  # PISO 2 -4, PISO 3º B
                             r'\s+PTA\.?\s*\d+',  # PTA 4, PTA. 5
                             r'\s+PUERTA\s*\d+',  # PUERTA 3
-                            r',?\s*(?:planta|piso|pta|puerta|pto|portal|local|bajo|entreplanta|ent|escalera|esc)\s*[^,]*',
-                            r',?\s*\d+[ªº]\s*[A-Za-z]?\s*$',  # '2ª A' al final
+                            r',?\s*\b(?:planta|piso|pta|puerta|pto|portal|local|bajo|entreplanta|entr|escalera|esc)\b\s*[^,]*',
+                            r',\s*\d+[ªº]\s*(?:DERECHA|IZQUIERDA|IZDA?|IZQ|DCHA?|DCH|CENTRO|CTR|[A-Z])\b.*$',  # ', 2º DERECHA', ', 9º D', ', 1ª IZQ' precedido por coma hasta fin
+                            r',?\s*\d+[ªº]\s*[A-Za-z]?\s*$',  # '2ª A' al final (sin palabra)
                             r',?\s*(?:bloque|blq|edificio|edif)\s*[^,]*',
                             r'\s*-\s*\d+\s*$',  # ' -69' al final (número de puerta)
                         ]
@@ -850,7 +852,7 @@ class WordPressPublisher:
             <li>Gestión post-adjudicación y escrituración</li>
         </ul>
         <p><strong>Primera consulta gratuita</strong> - Te explicamos si esta subasta es una buena oportunidad.</p>
-        <a href="{self.contact_url}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
+        <a href="{self.contact_url}?subasta={urllib.parse.quote(subasta.id_subasta)}&tipo={urllib.parse.quote(tipo_bien)}&localidad={urllib.parse.quote(localidad)}&provincia={urllib.parse.quote(provincia)}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
             Solicitar Análisis Gratuito
         </a>
     </div>
@@ -952,7 +954,7 @@ class WordPressPublisher:
 
         # Título SEO (puede ser ligeramente diferente al título del post)
         tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "Inmueble"
-        localidad = bien.localidad if bien and bien.localidad else "Andalucía"
+        localidad = bien.localidad if bien and bien.localidad else "España"
         provincia = bien.provincia if bien and bien.provincia else ""
 
         # Focus keyword para SEO
@@ -984,13 +986,16 @@ class WordPressPublisher:
             # SEO - Yoast compatible
             "_yoast_wpseo_metadesc": meta_description,
             "_yoast_wpseo_focuskw": focus_keyword,
+            "_yoast_wpseo_opengraph-title": f"Subasta {tipo} en {localidad} | Comprar en Subasta",
+            "_yoast_wpseo_opengraph-description": meta_description,
+            "_yoast_wpseo_twitter-title": f"Subasta {tipo} en {localidad} | Comprar en Subasta",
+            "_yoast_wpseo_twitter-description": meta_description,
 
             # SEO - Rank Math compatible
             "rank_math_description": meta_description,
             "rank_math_focus_keyword": focus_keyword,
-
-            # Open Graph para redes sociales
-            "_yoast_wpseo_opengraph-description": meta_description,
+            "rank_math_title": f"Subasta {tipo} en {localidad} | Comprar en Subasta",
+            "rank_math_canonical_url": "",
         }
 
         if bien:

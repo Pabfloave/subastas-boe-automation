@@ -152,6 +152,11 @@ def run_sync(
                                 stats.errores += 1
                                 continue
 
+                            # Asegurar provincia_codigo en todos los bienes
+                            for bien in subasta.bienes:
+                                if not bien.provincia_codigo:
+                                    bien.provincia_codigo = cod_provincia
+
                             if not dry_run and db:
                                 # Guardar en BD
                                 if existe:

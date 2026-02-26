@@ -2,12 +2,14 @@
 Parser para extraer datos estructurados del HTML del BOE.
 """
 import re
+import unicodedata
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 from bs4 import BeautifulSoup
 
 from ..models.subasta import Subasta, Bien
+from config.provinces import PROVINCIAS_ESPANA
 
 
 class SubastaParser:
@@ -342,20 +344,66 @@ class SubastaParser:
         else:
             return "Inmueble"
 
-    @staticmethod
-    def _get_codigo_provincia(nombre_provincia: str) -> str:
-        """Obtiene el código de provincia desde el nombre."""
-        provincias = {
-            "almería": "04", "almeria": "04",
-            "cádiz": "11", "cadiz": "11",
-            "córdoba": "14", "cordoba": "14",
-            "granada": "18",
-            "huelva": "21",
-            "jaén": "23", "jaen": "23",
-            "málaga": "29", "malaga": "29",
-            "sevilla": "41",
+    # Mapa nombre→código construido desde PROVINCIAS_ESPANA + aliases BOE
+    _NOMBRE_A_CODIGO = None
+
+    @classmethod
+    def _build_nombre_a_codigo(cls):
+        """Construye el mapa inverso nombre→código con variantes del BOE."""
+        if cls._NOMBRE_A_CODIGO is not None:
+            return
+
+        def normalize(s: str) -> str:
+            """Quita acentos y pasa a minúsculas."""
+            nfkd = unicodedata.normalize('NFKD', s)
+            return ''.join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
+        m = {}
+        for codigo, data in PROVINCIAS_ESPANA.items():
+            nombre = data["nombre"]
+            m[normalize(nombre)] = codigo
+            # Sin normalizar también (para match exacto)
+            m[nombre.lower().strip()] = codigo
+
+        # Aliases para nombres bilingües del BOE
+        aliases = {
+            "bizkaia": "48",         # Vizcaya
+            "gipuzkoa": "20",        # Guipúzcoa
+            "araba": "01",           # Álava
+            "illes balears": "07",   # Baleares
+            "alacant": "03",         # Alicante
+            "valencia": "46",        # València
+            "castello": "12",        # Castellón
         }
-        return provincias.get(nombre_provincia.lower().strip(), "")
+        for alias, codigo in aliases.items():
+            m[normalize(alias)] = codigo
+
+        cls._NOMBRE_A_CODIGO = m
+
+    @classmethod
+    def _get_codigo_provincia(cls, nombre_provincia: str) -> str:
+        """Obtiene el código de provincia desde el nombre (soporta variantes BOE)."""
+        cls._build_nombre_a_codigo()
+
+        def normalize(s: str) -> str:
+            nfkd = unicodedata.normalize('NFKD', s)
+            return ''.join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
+        nombre = nombre_provincia.strip()
+
+        # Intento 1: match directo normalizado
+        key = normalize(nombre)
+        if key in cls._NOMBRE_A_CODIGO:
+            return cls._NOMBRE_A_CODIGO[key]
+
+        # Intento 2: nombres bilingües "Valencia/València" → probar cada parte
+        if '/' in nombre:
+            for parte in nombre.split('/'):
+                key = normalize(parte)
+                if key in cls._NOMBRE_A_CODIGO:
+                    return cls._NOMBRE_A_CODIGO[key]
+
+        return ""
 
     @staticmethod
     def _inferir_estado(fecha_inicio: Optional[datetime], fecha_conclusion: Optional[datetime]) -> str:

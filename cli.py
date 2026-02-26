@@ -18,7 +18,7 @@ import click
 from datetime import datetime, timedelta
 
 from config import settings
-from config.provinces import PROVINCIAS_ANDALUCIA, get_provincia_nombre
+from config.provinces import PROVINCIAS_ANDALUCIA, PROVINCIAS_ESPANA, get_provincia_nombre
 from src.utils.logger import setup_logger
 
 
@@ -397,6 +397,306 @@ def publish(id_subasta, update):
 
     except Exception as e:
         click.secho(f"❌ Error publicando: {e}", fg='red')
+
+
+@cli.command('social')
+@click.argument('id_subasta')
+@click.option('--platform', '-p', type=click.Choice(['all', 'instagram', 'facebook', 'twitter', 'linkedin']),
+              default='all', help='Plataforma específica')
+@click.option('--output', '-o', type=click.Path(), help='Guardar en archivo')
+def social(id_subasta, platform, output):
+    """
+    Generar posts para redes sociales de una subasta.
+
+    Ejemplos:
+        python cli.py social SUB-JA-2025-249514
+        python cli.py social SUB-JA-2025-249514 -p instagram
+        python cli.py social SUB-JA-2025-249514 -o posts.txt
+    """
+    from src.models.database import Database
+    from src.social.post_generator import SocialPostGenerator
+
+    click.echo("=" * 60)
+    click.echo("GENERADOR DE POSTS PARA REDES SOCIALES")
+    click.echo("=" * 60)
+
+    try:
+        db = Database(settings.DB_PATH)
+        subasta = db.get_subasta(id_subasta)
+        db.close()
+
+        if not subasta:
+            click.secho(f"❌ Subasta {id_subasta} no encontrada en BD", fg='red')
+            return
+
+        generator = SocialPostGenerator()
+
+        if platform == 'all':
+            posts = generator.generate_all_platforms(subasta)
+        else:
+            method = getattr(generator, f'generate_{platform}')
+            posts = {platform: method(subasta)}
+
+        output_text = []
+
+        for plat, post in posts.items():
+            header = f"\n{'='*60}\n📱 {plat.upper()}\n{'='*60}"
+            content = post.full_post()
+            stats = f"\n📊 Caracteres: {post.character_count}\n🖼️ Imagen: {post.image_suggestion}"
+
+            click.echo(header)
+            click.echo(content)
+            click.secho(stats, fg='cyan')
+
+            output_text.append(f"{header}\n{content}\n{stats}")
+
+        if output:
+            with open(output, 'w', encoding='utf-8') as f:
+                f.write('\n\n'.join(output_text))
+            click.secho(f"\n✅ Posts guardados en: {output}", fg='green')
+
+        click.secho("\n✅ Posts generados correctamente", fg='green')
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg='red')
+
+
+@cli.command('social-batch')
+@click.option('--limit', '-l', type=int, default=5, help='Número de subastas')
+@click.option('--output-dir', '-o', type=click.Path(), default='./social_posts',
+              help='Directorio de salida')
+def social_batch(limit, output_dir):
+    """
+    Generar posts para múltiples subastas activas.
+
+    Ejemplos:
+        python cli.py social-batch
+        python cli.py social-batch --limit 10
+        python cli.py social-batch -o ./mi_carpeta
+    """
+    import os
+    from src.models.database import Database
+    from src.social.post_generator import SocialPostGenerator
+
+    click.echo("=" * 60)
+    click.echo("GENERACIÓN MASIVA DE POSTS PARA REDES SOCIALES")
+    click.echo("=" * 60)
+
+    try:
+        # Crear directorio si no existe
+        os.makedirs(output_dir, exist_ok=True)
+
+        db = Database(settings.DB_PATH)
+        # Obtener subastas activas
+        cursor = db.conn.cursor()
+        cursor.execute("""
+            SELECT id_subasta FROM subastas
+            WHERE activa = 1
+            ORDER BY fecha_conclusion ASC
+            LIMIT ?
+        """, (limit,))
+
+        subastas_ids = [row['id_subasta'] for row in cursor.fetchall()]
+
+        if not subastas_ids:
+            click.secho("No hay subastas activas en la base de datos", fg='yellow')
+            return
+
+        click.echo(f"Generando posts para {len(subastas_ids)} subastas...\n")
+
+        generator = SocialPostGenerator()
+
+        for i, id_subasta in enumerate(subastas_ids, 1):
+            subasta = db.get_subasta(id_subasta)
+            if not subasta:
+                continue
+
+            click.echo(f"[{i}/{len(subastas_ids)}] {id_subasta}")
+
+            posts = generator.generate_all_platforms(subasta)
+
+            # Guardar archivo por subasta
+            filename = os.path.join(output_dir, f"{id_subasta.replace('/', '-')}.txt")
+            with open(filename, 'w', encoding='utf-8') as f:
+                for plat, post in posts.items():
+                    f.write(f"{'='*60}\n")
+                    f.write(f"📱 {plat.upper()}\n")
+                    f.write(f"{'='*60}\n")
+                    f.write(post.full_post())
+                    f.write(f"\n\n📊 Caracteres: {post.character_count}\n")
+                    f.write(f"🖼️ Imagen: {post.image_suggestion}\n\n")
+
+            click.secho(f"   ✅ {filename}", fg='green')
+
+        db.close()
+
+        click.echo("\n" + "=" * 60)
+        click.secho(f"✅ Posts generados en: {output_dir}", fg='green')
+        click.echo(f"   Total archivos: {len(subastas_ids)}")
+
+    except Exception as e:
+        click.secho(f"❌ Error: {e}", fg='red')
+
+
+@cli.command('fix-categories')
+@click.option('--dry-run', is_flag=True, help='Solo mostrar cambios sin aplicar')
+@click.option('--update-db', is_flag=True, help='Actualizar provincia_codigo en BD')
+@click.option('--update-pages', is_flag=True, help='Regenerar páginas de provincia en WP')
+def fix_categories(dry_run, update_db, update_pages):
+    """
+    Corregir slugs de categorías de provincia en WordPress y BD.
+
+    Ejemplos:
+        python cli.py fix-categories --dry-run
+        python cli.py fix-categories
+        python cli.py fix-categories --update-db
+        python cli.py fix-categories --update-pages
+    """
+    import requests
+    import unicodedata
+
+    click.echo("=" * 60)
+    click.echo("CORRECCIÓN DE CATEGORÍAS DE PROVINCIA")
+    click.echo("=" * 60)
+
+    def normalize(s):
+        nfkd = unicodedata.normalize('NFKD', s)
+        return ''.join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
+    # Construir mapa nombre→(código, slug_correcto)
+    nombre_a_info = {}
+    for codigo, data in PROVINCIAS_ESPANA.items():
+        nombre_a_info[normalize(data["nombre"])] = (codigo, data["slug"])
+
+    # Aliases BOE
+    aliases = {
+        "bizkaia": ("48", "vizcaya"),
+        "gipuzkoa": ("20", "guipuzcoa"),
+        "araba": ("01", "alava"),
+        "illes balears": ("07", "baleares"),
+    }
+    nombre_a_info.update(aliases)
+
+    def match_provincia(name):
+        """Intenta resolver un nombre de categoría a (código, slug)."""
+        key = normalize(name)
+        if key in nombre_a_info:
+            return nombre_a_info[key]
+        # Probar partes de nombre bilingüe
+        if '/' in name:
+            for parte in name.split('/'):
+                k = normalize(parte)
+                if k in nombre_a_info:
+                    return nombre_a_info[k]
+        return None
+
+    # ─── Paso 1: Corregir categorías en WordPress ───
+    click.echo("\n📂 Buscando categorías en WordPress...")
+
+    api_url = f"{settings.WP_URL}/wp-json/wp/v2"
+    auth = (settings.WP_USER, settings.WP_APP_PASSWORD)
+
+    # Obtener categoría padre "Subastas"
+    resp = requests.get(f"{api_url}/categories", params={"slug": "subastas"})
+    subastas_cats = resp.json() if resp.status_code == 200 else []
+    parent_id = subastas_cats[0]["id"] if subastas_cats else None
+
+    if not parent_id:
+        click.secho("❌ No se encontró categoría padre 'Subastas'", fg='red')
+        return
+
+    # Obtener todas las categorías hijas
+    all_cats = []
+    page = 1
+    while True:
+        resp = requests.get(f"{api_url}/categories", params={
+            "parent": parent_id, "per_page": 100, "page": page
+        })
+        if resp.status_code != 200:
+            break
+        batch = resp.json()
+        if not batch:
+            break
+        all_cats.extend(batch)
+        page += 1
+
+    fixed = 0
+    skipped = 0
+    for cat in all_cats:
+        match = match_provincia(cat["name"])
+        if not match:
+            click.echo(f"  ⚠️  No se pudo mapear: {cat['name']} (slug: {cat['slug']})")
+            continue
+
+        codigo, slug_correcto = match
+        if cat["slug"] == slug_correcto:
+            skipped += 1
+            continue
+
+        click.echo(f"  🔧 {cat['name']}: slug '{cat['slug']}' → '{slug_correcto}'")
+        if not dry_run:
+            resp = requests.post(
+                f"{api_url}/categories/{cat['id']}",
+                auth=auth,
+                json={"slug": slug_correcto}
+            )
+            if resp.status_code == 200:
+                fixed += 1
+                click.secho(f"     ✅ Actualizado", fg='green')
+            else:
+                click.secho(f"     ❌ Error: {resp.status_code}", fg='red')
+        else:
+            fixed += 1
+
+    prefix = "[DRY-RUN] " if dry_run else ""
+    click.echo(f"\n{prefix}Categorías: {fixed} corregidas, {skipped} ya correctas")
+
+    # ─── Paso 2: Actualizar provincia_codigo en BD ───
+    if update_db:
+        click.echo("\n💾 Actualizando provincia_codigo en BD...")
+        from src.models.database import Database
+        from src.scraper.parser import SubastaParser
+
+        db = Database(settings.DB_PATH)
+        conn = db.conn
+        cursor = conn.execute(
+            "SELECT DISTINCT provincia FROM bienes WHERE provincia IS NOT NULL AND (provincia_codigo IS NULL OR provincia_codigo = '')"
+        )
+        provincias_sin_codigo = [row[0] for row in cursor.fetchall()]
+
+        updated_count = 0
+        for prov_name in provincias_sin_codigo:
+            codigo = SubastaParser._get_codigo_provincia(prov_name)
+            if codigo:
+                if not dry_run:
+                    conn.execute(
+                        "UPDATE bienes SET provincia_codigo = ? WHERE provincia = ? AND (provincia_codigo IS NULL OR provincia_codigo = '')",
+                        (codigo, prov_name)
+                    )
+                    updated_count += conn.total_changes
+                click.echo(f"  🔧 '{prov_name}' → código '{codigo}'")
+            else:
+                click.echo(f"  ⚠️  No se pudo resolver: '{prov_name}'")
+
+        if not dry_run:
+            conn.commit()
+        db.close()
+        click.echo(f"\n{prefix}BD: provincia_codigo actualizado para {len(provincias_sin_codigo)} provincias")
+
+    # ─── Paso 3: Regenerar páginas de provincia ───
+    if update_pages:
+        click.echo("\n📄 Regenerando páginas de provincia...")
+        from src.wordpress.page_generator import ProvinciaPageGenerator
+
+        generator = ProvinciaPageGenerator()
+        results = generator.create_all_pages()
+        created = len([r for r in results if r['action'] == 'created'])
+        updated_p = len([r for r in results if r['action'] == 'updated'])
+        errors = len([r for r in results if r['action'] == 'error'])
+        click.echo(f"\n  Páginas: {created} creadas, {updated_p} actualizadas, {errors} errores")
+
+    click.echo("\n" + "=" * 60)
+    click.secho("✅ Proceso completado", fg='green')
 
 
 if __name__ == '__main__':
