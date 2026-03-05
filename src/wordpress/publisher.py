@@ -84,34 +84,58 @@ class WordPressPublisher:
         """
         Genera el título SEO-optimizado del post.
 
-        Formato: "Subasta [Tipo] en [Localidad] desde [Precio] - [Provincia]"
-        Ejemplo: "Subasta Piso en Sevilla desde 45.000€ - Sevilla"
+        Máximo 60 caracteres para evitar truncamiento en Google SERPs.
+        Prioridad: tipo + localidad > precio > provincia.
         """
         bien = subasta.get_bien_principal()
 
-        # Tipo de inmueble
+        # Tipo de inmueble (abreviar tipos largos)
         tipo = "Inmueble"
         if bien and bien.subtipo_bien:
-            tipo = bien.subtipo_bien.title()
+            raw = bien.subtipo_bien.title()
+            # Abreviar tipos que alargan el título
+            abreviaturas = {
+                "Vivienda Unifamiliar": "Casa",
+                "Vivienda Unifamiliar Adosada": "Adosado",
+                "Vivienda Unifamiliar Pareada": "Pareado",
+                "Local Comercial": "Local",
+                "Nave Industrial": "Nave",
+                "Plaza De Garaje": "Garaje",
+                "Finca Rústica": "Finca",
+                "Finca Urbana": "Finca Urbana",
+                "Solar Sin Edificar": "Solar",
+            }
+            tipo = abreviaturas.get(raw, raw)
 
         # Localidad
         localidad = "España"
         if bien and bien.localidad:
             localidad = bien.localidad.title()
 
-        # Precio formateado (sin decimales para título más limpio)
+        # Precio formateado
         precio_str = ""
         if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
             precio = float(subasta.valor_subasta)
             if precio >= 1000:
                 precio_str = f" desde {precio:,.0f}€".replace(",", ".")
 
-        # Provincia para contexto geográfico
-        provincia = ""
+        # Provincia (solo si diferente a localidad)
+        provincia_str = ""
         if bien and bien.provincia and bien.provincia.lower() != localidad.lower():
-            provincia = f" - {bien.provincia}"
+            provincia_str = f" ({bien.provincia})"
 
-        return f"Subasta {tipo} en {localidad}{precio_str}{provincia}"
+        # Construir título respetando límite de 60 chars
+        base = f"Subasta {tipo} en {localidad}"
+        if len(base + precio_str + provincia_str) <= 60:
+            return base + precio_str + provincia_str
+        if len(base + precio_str) <= 60:
+            return base + precio_str
+        if len(base + provincia_str) <= 60:
+            return base + provincia_str
+        if len(base) <= 60:
+            return base
+        # Último recurso: truncar
+        return base[:57] + "..."
 
     def _generate_meta_description(self, subasta: Subasta) -> str:
         """
@@ -161,8 +185,8 @@ class WordPressPublisher:
         """
         Genera Schema.org JSON-LD para rich snippets en Google.
 
-        Usa el tipo "Product" con "Offer" para mostrar precio en resultados.
-        También incluye "RealEstateListing" para contexto inmobiliario.
+        Incluye: RealEstateListing, BreadcrumbList, LegalService.
+        NO incluye BlogPosting (Rank Math lo desactiva via meta).
         """
         import json
 
@@ -174,6 +198,7 @@ class WordPressPublisher:
         provincia = bien.provincia if bien and bien.provincia else "España"
         direccion = bien.direccion if bien and bien.direccion else ""
         codigo_postal = bien.codigo_postal if bien and bien.codigo_postal else ""
+        provincia_slug = get_provincia_slug(bien.provincia_codigo) if bien and bien.provincia_codigo else ""
 
         # Precio
         precio = float(subasta.valor_subasta) if subasta.valor_subasta else 0
@@ -183,7 +208,36 @@ class WordPressPublisher:
         if subasta.fecha_conclusion:
             fecha_disponible = subasta.fecha_conclusion.strftime("%Y-%m-%d")
 
-        # Schema principal: RealEstateListing
+        site_url = "https://comprarensubasta.com"
+
+        # Schema 1: BreadcrumbList
+        breadcrumb_items = [
+            {"@type": "ListItem", "position": 1, "name": "Inicio", "item": site_url},
+            {"@type": "ListItem", "position": 2, "name": "Subastas Judiciales", "item": f"{site_url}/subastas-judiciales/"},
+        ]
+        if provincia_slug:
+            breadcrumb_items.append({
+                "@type": "ListItem", "position": 3,
+                "name": f"Subastas en {provincia}",
+                "item": f"{site_url}/subastas-judiciales-{provincia_slug}/"
+            })
+            breadcrumb_items.append({
+                "@type": "ListItem", "position": 4,
+                "name": f"Subasta {tipo} en {localidad}"
+            })
+        else:
+            breadcrumb_items.append({
+                "@type": "ListItem", "position": 3,
+                "name": f"Subasta {tipo} en {localidad}"
+            })
+
+        breadcrumb_schema = {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": breadcrumb_items
+        }
+
+        # Schema 2: RealEstateListing
         schema = {
             "@context": "https://schema.org",
             "@type": "RealEstateListing",
@@ -218,13 +272,13 @@ class WordPressPublisher:
                 }
             }
 
-        # Schema secundario: Organization (para el despacho)
+        # Schema 3: LegalService (para el despacho)
         org_schema = {
             "@context": "https://schema.org",
             "@type": "LegalService",
             "name": "CAFAVE INVESTMENT - Comprar en Subasta",
             "description": "Asesoramiento legal especializado en subastas judiciales e inmobiliarias en España",
-            "url": "https://comprarensubasta.com",
+            "url": site_url,
             "areaServed": {
                 "@type": "Country",
                 "name": "España"
@@ -232,8 +286,10 @@ class WordPressPublisher:
             "serviceType": ["Asesoramiento legal en subastas", "Gestión de pujas", "Análisis de cargas registrales", "Mandatos de compra en subasta"]
         }
 
-        # Combinar ambos schemas
         return f'''<script type="application/ld+json">
+{json.dumps(breadcrumb_schema, ensure_ascii=False, indent=2)}
+</script>
+<script type="application/ld+json">
 {json.dumps(schema, ensure_ascii=False, indent=2)}
 </script>
 <script type="application/ld+json">
@@ -508,6 +564,21 @@ class WordPressPublisher:
     color: white !important;
 }
 
+/* Breadcrumbs */
+.breadcrumbs {
+    font-size: 0.85em;
+    color: #6b7280;
+    margin-bottom: 20px;
+    padding: 10px 0;
+}
+.breadcrumbs a {
+    color: #2563eb;
+    text-decoration: none;
+}
+.breadcrumbs a:hover {
+    text-decoration: underline;
+}
+
 /* Estilos para valores económicos del lote */
 .valores-lote {
     background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
@@ -546,10 +617,21 @@ class WordPressPublisher:
 </style>
 """
 
+        # Breadcrumbs HTML visible
+        provincia_slug = get_provincia_slug(bien.provincia_codigo) if bien and bien.provincia_codigo else ""
+        breadcrumb_html = '<nav class="breadcrumbs" aria-label="Breadcrumb"><span><a href="/">Inicio</a></span>'
+        breadcrumb_html += ' &rsaquo; <span><a href="/subastas-judiciales/">Subastas</a></span>'
+        if provincia_slug and provincia:
+            breadcrumb_html += f' &rsaquo; <span><a href="/subastas-judiciales-{provincia_slug}/">{provincia}</a></span>'
+        breadcrumb_html += f' &rsaquo; <span>{tipo_bien.title()} en {localidad}</span></nav>'
+
         html = f"""{schema_markup}
 {faq_schema}
 {css_styles}
 <div class="subasta-detalle">
+
+    <!-- Breadcrumbs -->
+    {breadcrumb_html}
 
     <!-- Alerta de Estado -->
     <div class="subasta-alerta {estado_class}">
@@ -960,6 +1042,16 @@ class WordPressPublisher:
         # Focus keyword para SEO
         focus_keyword = f"subasta {tipo.lower()} {localidad.lower()}"
 
+        # SEO title (<60 chars) - priorizar información útil
+        seo_title = f"Subasta {tipo} en {localidad} | Comprar en Subasta"
+        if len(seo_title) > 60:
+            seo_title = f"Subasta {tipo} en {localidad}"
+        if len(seo_title) > 60:
+            seo_title = seo_title[:57] + "..."
+
+        # OG/Twitter title (puede ser algo más largo, ~95 chars max)
+        og_title = f"Subasta {tipo} en {localidad} | Comprar en Subasta"
+
         # Número de lotes
         num_lotes = len(subasta.bienes)
 
@@ -986,16 +1078,18 @@ class WordPressPublisher:
             # SEO - Yoast compatible
             "_yoast_wpseo_metadesc": meta_description,
             "_yoast_wpseo_focuskw": focus_keyword,
-            "_yoast_wpseo_opengraph-title": f"Subasta {tipo} en {localidad} | Comprar en Subasta",
+            "_yoast_wpseo_opengraph-title": og_title,
             "_yoast_wpseo_opengraph-description": meta_description,
-            "_yoast_wpseo_twitter-title": f"Subasta {tipo} en {localidad} | Comprar en Subasta",
+            "_yoast_wpseo_twitter-title": og_title,
             "_yoast_wpseo_twitter-description": meta_description,
 
             # SEO - Rank Math compatible
             "rank_math_description": meta_description,
             "rank_math_focus_keyword": focus_keyword,
-            "rank_math_title": f"Subasta {tipo} en {localidad} | Comprar en Subasta",
+            "rank_math_title": seo_title,
             "rank_math_canonical_url": "",
+            # Disable Rank Math auto-schema (we generate our own JSON-LD)
+            "rank_math_rich_snippet": "off",
         }
 
         if bien:
