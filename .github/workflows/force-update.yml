@@ -86,30 +86,48 @@ jobs:
       - name: Crear directorios
         run: mkdir -p data logs
 
-      - name: Descargar base de datos
-        uses: actions/download-artifact@v4
+      - name: Restaurar BD desde cache
+        id: cache-db-restore
+        uses: actions/cache/restore@v4
         with:
-          name: subastas-db
-          path: data/
-        continue-on-error: true
+          path: data/subastas.db
+          key: subastas-db-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            subastas-db-
 
-      - name: Ejecutar actualización forzada
+      - name: Estado de la BD
+        env:
+          CACHE_HIT: ${{ steps.cache-db-restore.outputs.cache-hit }}
+          CACHE_KEY: ${{ steps.cache-db-restore.outputs.cache-matched-key }}
         run: |
-          echo "🔄 ACTUALIZACIÓN FORZADA DE SUBASTAS"
+          if [ -f data/subastas.db ]; then
+            echo "BD presente ($(du -h data/subastas.db | cut -f1))"
+            echo "   Cache hit: $CACHE_HIT"
+            echo "   Cache key matched: $CACHE_KEY"
+          else
+            echo "BD no encontrada - se creara vacia"
+          fi
+
+      - name: Ejecutar actualizacion forzada
+        env:
+          PROVINCIAS: ${{ steps.config.outputs.PROVINCIAS }}
+          FORCE_UPDATE: ${{ github.event.inputs.force_update }}
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          echo "ACTUALIZACION FORZADA DE SUBASTAS"
           echo "=============================================="
-          echo "⏰ Inicio: $(date -u)"
-          echo "📍 Provincias: ${{ steps.config.outputs.PROVINCIAS }}"
-          echo "🔄 Force update: ${{ github.event.inputs.force_update }}"
-          echo "📊 Límite: ${{ github.event.inputs.limit }}"
+          echo "Inicio: $(date -u)"
+          echo "Provincias: $PROVINCIAS"
+          echo "Force update: $FORCE_UPDATE"
+          echo "Limite: $LIMIT"
           echo "=============================================="
 
           FORCE_FLAG=""
-          if [ "${{ github.event.inputs.force_update }}" = "true" ]; then
+          if [ "$FORCE_UPDATE" = "true" ]; then
             FORCE_FLAG="--force"
-            echo "⚠️ MODO FORCE ACTIVADO - Se re-extraerán y actualizarán TODAS las subastas"
+            echo "MODO FORCE ACTIVADO - Se re-extraeran y actualizaran TODAS las subastas"
           fi
 
-          LIMIT="${{ github.event.inputs.limit }}"
           LIMIT_FLAG=""
           if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then
             LIMIT_FLAG="--limit $LIMIT"
@@ -120,13 +138,12 @@ jobs:
           python cli.py sync $FORCE_FLAG $LIMIT_FLAG
         timeout-minutes: 270
 
-      - name: Guardar base de datos
-        uses: actions/upload-artifact@v4
-        with:
-          name: subastas-db
-          path: data/subastas.db
-          retention-days: 90
+      - name: Guardar BD en cache
         if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/subastas.db
+          key: subastas-db-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Mostrar logs
         if: always()

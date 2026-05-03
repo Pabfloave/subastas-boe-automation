@@ -55,10 +55,11 @@ jobs:
 
       - name: Determinar grupo de provincias
         id: provincias
+        env:
+          INPUT_GRUPO: ${{ github.event.inputs.grupo }}
         run: |
           # Determinar qué grupo procesar basándose en la hora o input manual
           HORA=$(date -u +%H)
-          INPUT_GRUPO="${{ github.event.inputs.grupo }}"
 
           if [ "$INPUT_GRUPO" = "todos" ]; then
             # Procesar todas las provincias
@@ -121,17 +122,35 @@ jobs:
       - name: Crear directorios
         run: mkdir -p data logs
 
-      - name: Descargar base de datos
-        uses: actions/download-artifact@v4
+      - name: Restaurar BD desde cache
+        id: cache-db-restore
+        uses: actions/cache/restore@v4
         with:
-          name: subastas-db
-          path: data/
-        continue-on-error: true
+          path: data/subastas.db
+          key: subastas-db-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            subastas-db-
+
+      - name: Estado de la BD
+        env:
+          CACHE_HIT: ${{ steps.cache-db-restore.outputs.cache-hit }}
+          CACHE_KEY: ${{ steps.cache-db-restore.outputs.cache-matched-key }}
+        run: |
+          if [ -f data/subastas.db ]; then
+            echo "✅ BD presente ($(du -h data/subastas.db | cut -f1))"
+            echo "   Cache hit: $CACHE_HIT"
+            echo "   Cache key matched: $CACHE_KEY"
+          else
+            echo "⚠️  BD no encontrada - se creará vacía (¡posibles duplicados en primera ejecución!)"
+          fi
 
       - name: Ejecutar sincronización
+        env:
+          GRUPO: ${{ steps.provincias.outputs.GRUPO }}
+          PROVINCIAS: ${{ steps.provincias.outputs.PROVINCIAS }}
         run: |
-          echo "🚀 Iniciando sincronización - Grupo ${{ steps.provincias.outputs.GRUPO }}"
-          echo "📍 Provincias: ${{ steps.provincias.outputs.PROVINCIAS }}"
+          echo "🚀 Iniciando sincronización - Grupo $GRUPO"
+          echo "📍 Provincias: $PROVINCIAS"
           echo "⏰ Hora UTC: $(date -u)"
           echo "=============================================="
 
@@ -139,13 +158,12 @@ jobs:
           python cli.py sync
         timeout-minutes: 90
 
-      - name: Guardar base de datos
-        uses: actions/upload-artifact@v4
-        with:
-          name: subastas-db
-          path: data/subastas.db
-          retention-days: 90
+      - name: Guardar BD en cache
         if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/subastas.db
+          key: subastas-db-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Mostrar logs
         if: always()

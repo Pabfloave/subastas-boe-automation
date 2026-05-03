@@ -65,35 +65,51 @@ jobs:
       - name: Crear directorios
         run: mkdir -p data logs
 
-      - name: Descargar base de datos
-        uses: actions/download-artifact@v4
+      - name: Restaurar BD desde cache
+        id: cache-db-restore
+        uses: actions/cache/restore@v4
         with:
-          name: subastas-db
-          path: data/
-        continue-on-error: true
+          path: data/subastas.db
+          key: subastas-db-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            subastas-db-
+
+      - name: Estado de la BD
+        env:
+          CACHE_HIT: ${{ steps.cache-db-restore.outputs.cache-hit }}
+          CACHE_KEY: ${{ steps.cache-db-restore.outputs.cache-matched-key }}
+        run: |
+          if [ -f data/subastas.db ]; then
+            echo "BD presente ($(du -h data/subastas.db | cut -f1))"
+            echo "   Cache hit: $CACHE_HIT"
+            echo "   Cache key matched: $CACHE_KEY"
+          else
+            echo "BD no encontrada - cleanup no podra despublicar nada"
+          fi
 
       - name: Ejecutar limpieza
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
-          echo "🧹 Iniciando limpieza de subastas finalizadas/canceladas"
-          echo "⏰ Hora UTC: $(date -u)"
+          echo "Iniciando limpieza de subastas finalizadas/canceladas"
+          echo "Hora UTC: $(date -u)"
           echo "=============================================="
 
           DRY_RUN_FLAG=""
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "$DRY_RUN" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
-            echo "⚠️ MODO DRY-RUN: No se realizarán cambios reales"
+            echo "MODO DRY-RUN: No se realizaran cambios reales"
           fi
 
           python cli.py cleanup $DRY_RUN_FLAG
         timeout-minutes: 45
 
-      - name: Guardar base de datos
-        uses: actions/upload-artifact@v4
-        with:
-          name: subastas-db
-          path: data/subastas.db
-          retention-days: 90
+      - name: Guardar BD en cache
         if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/subastas.db
+          key: subastas-db-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Mostrar logs
         if: always()

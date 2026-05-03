@@ -98,7 +98,8 @@ class WordPressClient:
         categories: List[int] = None,
         tags: List[int] = None,
         meta: Dict[str, Any] = None,
-        featured_media: int = None
+        featured_media: int = None,
+        slug: str = None,
     ) -> Dict:
         """
         Crea un nuevo post en WordPress.
@@ -111,6 +112,7 @@ class WordPressClient:
             tags: Lista de IDs de tags
             meta: Campos meta personalizados
             featured_media: ID de imagen destacada
+            slug: Slug determinista (si se omite, WP lo genera del título)
 
         Returns:
             Datos del post creado
@@ -129,6 +131,8 @@ class WordPressClient:
             data["meta"] = meta
         if featured_media:
             data["featured_media"] = featured_media
+        if slug:
+            data["slug"] = slug
 
         response = requests.post(
             f"{self.api_url}/posts",
@@ -171,36 +175,87 @@ class WordPressClient:
             logger.error(f"Error actualizando post: {response.status_code}")
             response.raise_for_status()
 
+    @staticmethod
+    def make_subasta_slug(id_subasta: str) -> str:
+        """
+        Genera un slug determinista para un id_subasta.
+
+        WP slugs son únicos y se buscan en O(1), por lo que un slug
+        predecible es la forma más fiable de detectar duplicados sin
+        depender de campos meta (que WP no expone por REST por defecto).
+        """
+        import re
+        s = id_subasta.lower().replace("_", "-").replace("/", "-")
+        s = re.sub(r"[^a-z0-9-]+", "-", s)
+        s = re.sub(r"-+", "-", s).strip("-")
+        return f"subasta-{s}"
+
+    def get_post_by_subasta_id(self, id_subasta: str) -> Optional[Dict]:
+        """
+        Busca un post existente para una subasta dada.
+
+        Estrategia (en orden):
+        1. Búsqueda por slug determinista (rápida, exacta).
+        2. Búsqueda por contenido (id_subasta aparece literal en el HTML
+           del post — tabla "Identificador", URL del BOE, etc.).
+           Cubre posts antiguos creados sin slug determinista.
+
+        WP no expone meta keys con prefijo "_" por la REST API por defecto,
+        por eso no usamos `get_post_by_meta` para detectar duplicados.
+        """
+        slug = self.make_subasta_slug(id_subasta)
+
+        # Estrategia 1: slug determinista
+        try:
+            response = requests.get(
+                f"{self.api_url}/posts",
+                headers=self.headers,
+                params={"slug": slug, "status": "any", "per_page": 1},
+                timeout=15,
+            )
+            if response.status_code == 200:
+                posts = response.json()
+                if posts:
+                    return posts[0]
+        except requests.RequestException as e:
+            logger.warning(f"Error buscando por slug {slug}: {e}")
+
+        # Estrategia 2: búsqueda por contenido
+        try:
+            response = requests.get(
+                f"{self.api_url}/posts",
+                headers=self.headers,
+                params={
+                    "search": id_subasta,
+                    "status": "any",
+                    "per_page": 10,
+                    "_fields": "id,slug,date,content,link",
+                },
+                timeout=30,
+            )
+            if response.status_code == 200:
+                candidates = []
+                for post in response.json():
+                    content_obj = post.get("content", {})
+                    rendered = content_obj.get("rendered", "") if isinstance(content_obj, dict) else ""
+                    if id_subasta in rendered:
+                        candidates.append(post)
+                if candidates:
+                    candidates.sort(key=lambda p: p.get("date", ""), reverse=True)
+                    return candidates[0]
+        except requests.RequestException as e:
+            logger.warning(f"Error buscando por contenido {id_subasta}: {e}")
+
+        return None
+
     def get_post_by_meta(self, meta_key: str, meta_value: str) -> Optional[Dict]:
         """
-        Busca un post por un campo meta.
-
-        Args:
-            meta_key: Nombre del campo meta
-            meta_value: Valor a buscar
-
-        Returns:
-            Datos del post o None si no existe
+        Compatibilidad legacy. Para buscar posts por id_subasta usar
+        `get_post_by_subasta_id`, que es robusto y no depende de que el
+        meta esté expuesto por REST.
         """
-        # WordPress REST API no soporta búsqueda por meta directamente
-        # Necesitamos buscar y filtrar
-        response = requests.get(
-            f"{self.api_url}/posts",
-            headers=self.headers,
-            params={
-                "per_page": 100,
-                "status": "any",
-            },
-            timeout=30
-        )
-
-        if response.status_code == 200:
-            posts = response.json()
-            for post in posts:
-                meta = post.get("meta", {})
-                if meta.get(meta_key) == meta_value:
-                    return post
-
+        if meta_key == "_subasta_id":
+            return self.get_post_by_subasta_id(meta_value)
         return None
 
     def get_or_create_category(self, name: str, slug: str = None, parent: int = None) -> int:

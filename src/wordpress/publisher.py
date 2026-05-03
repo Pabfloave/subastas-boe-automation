@@ -44,7 +44,7 @@ class WordPressPublisher:
         Returns:
             ID del post creado/actualizado
         """
-        # Verificar si ya existe
+        # Verificar si ya existe (slug determinista + búsqueda por contenido)
         existing_post = self._find_existing_post(subasta.id_subasta)
 
         # Generar contenido
@@ -53,6 +53,7 @@ class WordPressPublisher:
         categories = self._get_categories(subasta)
         tags = self._get_tags(subasta)
         meta = self._generate_meta(subasta)
+        slug = self.client.make_subasta_slug(subasta.id_subasta)
 
         post_data = {
             "title": title,
@@ -61,6 +62,7 @@ class WordPressPublisher:
             "categories": categories,
             "tags": tags,
             "meta": meta,
+            "slug": slug,
         }
 
         if existing_post and update_if_exists:
@@ -77,8 +79,8 @@ class WordPressPublisher:
             return post_id
 
     def _find_existing_post(self, id_subasta: str) -> Optional[dict]:
-        """Busca un post existente por ID de subasta."""
-        return self.client.get_post_by_meta("_subasta_id", id_subasta)
+        """Busca un post existente para una subasta."""
+        return self.client.get_post_by_subasta_id(id_subasta)
 
     def _generate_title(self, subasta: Subasta) -> str:
         """
