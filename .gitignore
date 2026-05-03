@@ -16,6 +16,10 @@ env/
 data/*.db
 data/*.db-journal
 
+# Inventarios y resultados de scripts de mantenimiento
+scripts/wp_inventory.json
+scripts/dedup_result.json
+
 # Logs
 logs/
 *.log

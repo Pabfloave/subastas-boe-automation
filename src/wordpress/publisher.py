@@ -53,7 +53,6 @@ class WordPressPublisher:
         categories = self._get_categories(subasta)
         tags = self._get_tags(subasta)
         meta = self._generate_meta(subasta)
-        slug = self.client.make_subasta_slug(subasta.id_subasta)
 
         post_data = {
             "title": title,
@@ -62,17 +61,20 @@ class WordPressPublisher:
             "categories": categories,
             "tags": tags,
             "meta": meta,
-            "slug": slug,
         }
 
         if existing_post and update_if_exists:
-            # Actualizar post existente
+            # Actualizar post existente. NO tocamos el slug para no romper
+            # URLs ya indexadas en buscadores; los posts antiguos conservan su
+            # slug original (la búsqueda por contenido los encuentra igual).
             post_id = existing_post["id"]
             self.client.update_post(post_id, post_data)
             logger.info(f"Post actualizado: {post_id} - {subasta.id_subasta}")
             return post_id
         else:
-            # Crear nuevo post
+            # Posts nuevos: slug determinista para que get_post_by_subasta_id
+            # los encuentre en O(1) en futuras ejecuciones.
+            post_data["slug"] = self.client.make_subasta_slug(subasta.id_subasta)
             result = self.client.create_post(**post_data)
             post_id = result["id"]
             logger.info(f"Post creado: {post_id} - {subasta.id_subasta}")
