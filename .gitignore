@@ -12,13 +12,16 @@ env/
 # Environment variables (contiene credenciales)
 .env
 
-# Base de datos local
+# Base de datos local (cualquier .db excepto la de producción)
 data/*.db
 data/*.db-journal
+!data/subastas.db
 
-# Inventarios y resultados de scripts de mantenimiento
+# Inventarios y resultados de scripts de mantenimiento (binarios grandes)
 scripts/wp_inventory.json
 scripts/dedup_result.json
+scripts/dedup_despublicar.sql
+scripts/cleanup_finalizadas.sql
 
 # Logs
 logs/
