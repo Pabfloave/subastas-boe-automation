@@ -198,27 +198,49 @@ def cmd_inventory(args):
             print(f"  {id_sub}: {len(posts)} posts (oldest: {min(p['date'] for p in posts)})")
 
 
-def _delete_post(client: WordPressClient, post_id: int, force: bool, max_retries: int = 3) -> tuple[int, int]:
-    """Borra un post con reintentos exponenciales. Devuelve (post_id, status_code)."""
-    params = {"force": "true"} if force else {}
+def _process_post(
+    client: WordPressClient,
+    post_id: int,
+    mode: str,
+    max_retries: int = 3,
+) -> tuple[int, int]:
+    """Procesa un post según `mode`:
+
+    - `draft`        : PUT status=draft (rápido, recuperable, default)
+    - `trash`        : DELETE sin force (mueve a papelera)
+    - `delete`       : DELETE force=true (borrado permanente)
+
+    Devuelve (post_id, status_code).
+    """
     last_status = 0
     for attempt in range(max_retries):
         try:
-            response = requests.delete(
-                f"{client.api_url}/posts/{post_id}",
-                headers=client.headers,
-                params=params,
-                timeout=30,
-            )
+            if mode == "draft":
+                response = requests.put(
+                    f"{client.api_url}/posts/{post_id}",
+                    headers=client.headers,
+                    json={"status": "draft"},
+                    timeout=60,
+                )
+            elif mode == "trash":
+                response = requests.delete(
+                    f"{client.api_url}/posts/{post_id}",
+                    headers=client.headers,
+                    timeout=60,
+                )
+            else:  # delete
+                response = requests.delete(
+                    f"{client.api_url}/posts/{post_id}",
+                    headers=client.headers,
+                    params={"force": "true"},
+                    timeout=60,
+                )
             last_status = response.status_code
-            # 200 OK, 410 Gone (ya estaba borrado) → éxito
             if last_status in (200, 410, 404):
                 return post_id, last_status
-            # 5xx o 429 → reintentable
             if last_status >= 500 or last_status == 429:
                 time.sleep(2 ** attempt)
                 continue
-            # 4xx no reintentable
             return post_id, last_status
         except requests.RequestException:
             time.sleep(2 ** attempt)
@@ -256,44 +278,52 @@ def cmd_dedup(args):
     logger.info(f"Posts a borrar: {len(posts_a_borrar)}")
     logger.info(f"Posts sobrevivientes: {len(survivors)}")
 
+    accion = {
+        "draft": "DESPUBLICAR (status=draft, recuperable)",
+        "trash": "MOVER A PAPELERA",
+        "delete": "BORRAR PERMANENTE",
+    }[args.mode]
+
     if args.dry_run:
-        print("\n[DRY-RUN] No se borrará nada. Ejemplos:")
+        print(f"\nAcción: {accion}")
+        print(f"\n[DRY-RUN] No se modifica nada. Ejemplos:")
         for id_sub, posts in list(duplicates.items())[:5]:
             sobreviv = survivors[id_sub]
-            print(f"  {id_sub}: mantener post {sobreviv}, borrar {[p['id'] for p in posts if p['id'] != sobreviv]}")
+            print(f"  {id_sub}: mantener post {sobreviv}, procesar {[p['id'] for p in posts if p['id'] != sobreviv]}")
         return
 
-    # Confirmar antes de borrar masivamente
+    # Confirmar antes de procesar masivamente
     if not args.yes:
-        resp = input(f"\n¿Borrar {len(posts_a_borrar)} posts? [escribe 'BORRAR']: ")
-        if resp != "BORRAR":
+        resp = input(f"\n¿{accion} {len(posts_a_borrar)} posts? [escribe 'SI']: ")
+        if resp != "SI":
             print("Cancelado.")
             return
 
     client = WordPressClient()
-    deleted_ok = 0
-    deleted_fail = []
+    ok = 0
+    fail = []
     start = time.time()
 
-    # Ejecutar en paralelo con thread pool
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {
-            executor.submit(_delete_post, client, pid, args.force_delete): pid
+            executor.submit(_process_post, client, pid, args.mode): pid
             for pid in posts_a_borrar
         }
         for i, future in enumerate(as_completed(futures), 1):
             post_id, status = future.result()
-            if status in (200, 410):
-                deleted_ok += 1
+            if status in (200, 410, 404):
+                ok += 1
             else:
-                deleted_fail.append((post_id, status))
+                fail.append((post_id, status))
             if i % 100 == 0:
                 rate = i / (time.time() - start)
                 eta = (len(posts_a_borrar) - i) / rate if rate > 0 else 0
                 logger.info(f"  {i}/{len(posts_a_borrar)} ({rate:.1f} req/s, ETA {eta/60:.0f}min)")
 
     duracion = time.time() - start
-    logger.info(f"Borrado completo en {duracion/60:.1f}min: {deleted_ok} OK, {len(deleted_fail)} errores")
+    logger.info(f"Procesado completo en {duracion/60:.1f}min: {ok} OK, {len(fail)} errores")
+    deleted_ok = ok
+    deleted_fail = fail
 
     # Guardar resumen de la operación
     result_path = Path(__file__).parent / "dedup_result.json"
@@ -387,14 +417,13 @@ def main():
     p_inv.add_argument("--limit", type=int, default=0, help="Limitar nº de posts (debug)")
     p_inv.add_argument("--sleep", type=float, default=0.3, help="Sleep entre páginas (s)")
 
-    p_dedup = sub.add_parser("dedup", help="Borrar duplicados según inventario")
+    p_dedup = sub.add_parser("dedup", help="Procesar duplicados según inventario")
     p_dedup.add_argument("--dry-run", action="store_true", default=True)
     p_dedup.add_argument("--execute", action="store_true", help="Desactiva dry-run")
-    p_dedup.add_argument("--workers", type=int, default=4, help="Hilos paralelos para DELETE")
-    p_dedup.add_argument("--force-delete", action="store_true", default=True,
-                         help="DELETE permanente con force=true (default)")
-    p_dedup.add_argument("--trash", action="store_true",
-                         help="Mover a papelera en vez de borrar permanente")
+    p_dedup.add_argument("--workers", type=int, default=8, help="Hilos paralelos")
+    p_dedup.add_argument("--mode", choices=["draft", "trash", "delete"], default="draft",
+                         help="draft: PUT status=draft (rápido, recuperable); "
+                              "trash: DELETE sin force; delete: DELETE force=true")
     p_dedup.add_argument("--yes", action="store_true", help="Sin confirmación interactiva")
 
     p_rebuild = sub.add_parser("rebuild-db", help="Reconstruir wp_post_id en la BD local")
@@ -407,8 +436,6 @@ def main():
     elif args.cmd == "dedup":
         if args.execute:
             args.dry_run = False
-        if args.trash:
-            args.force_delete = False
         cmd_dedup(args)
     elif args.cmd == "rebuild-db":
         cmd_rebuild_db(args)
