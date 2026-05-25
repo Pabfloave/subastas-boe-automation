@@ -127,12 +127,26 @@ class Database:
             )
         """)
 
+        # Cache de geocodificación para direcciones de subastas
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS geocode_cache (
+                direccion_hash TEXT PRIMARY KEY,
+                direccion_raw TEXT NOT NULL,
+                lat REAL,
+                lng REAL,
+                status TEXT NOT NULL,
+                formatted_address TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Índices
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_id_subasta ON subastas(id_subasta)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_estado ON subastas(estado)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_publicado ON subastas(publicado_wp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_bien_subasta ON bienes(id_subasta)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_bien_provincia ON bienes(provincia_codigo)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_geocode_status ON geocode_cache(status)")
 
         self.conn.commit()
 
@@ -556,3 +570,48 @@ class Database:
                 "fecha_conclusion": datetime.fromisoformat(row["fecha_conclusion"]) if row["fecha_conclusion"] else None,
             })
         return subastas
+
+    def get_geocode(self, direccion_hash: str) -> Optional[dict]:
+        """Devuelve la entrada cacheada para un hash de dirección, o None si no existe."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT direccion_raw, lat, lng, status, formatted_address
+            FROM geocode_cache
+            WHERE direccion_hash = ?
+        """, (direccion_hash,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "direccion_raw": row["direccion_raw"],
+            "lat": row["lat"],
+            "lng": row["lng"],
+            "status": row["status"],
+            "formatted_address": row["formatted_address"],
+        }
+
+    def save_geocode(
+        self,
+        direccion_hash: str,
+        direccion_raw: str,
+        lat: Optional[float],
+        lng: Optional[float],
+        status: str,
+        formatted_address: Optional[str] = None,
+    ):
+        """Persiste un resultado de geocodificación. status debe ser 'ok' o 'failed'."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO geocode_cache
+                (direccion_hash, direccion_raw, lat, lng, status, formatted_address, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            direccion_hash,
+            direccion_raw,
+            lat,
+            lng,
+            status,
+            formatted_address,
+            datetime.now().isoformat(),
+        ))
+        self.conn.commit()

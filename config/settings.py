@@ -26,6 +26,10 @@ WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
 WP_POST_STATUS = os.getenv("WP_POST_STATUS", "publish")
 WP_CONTACT_FORM_URL = os.getenv("WP_CONTACT_FORM_URL", "https://comprarensubasta.com/#analisis")
 
+# Google Maps Platform (Geocoding + Maps Embed APIs)
+# Si está vacía, el publisher hace fallback al iframe basado en texto bruto.
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+
 # Base de datos
 DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "subastas.db"))
 

@@ -107,6 +107,7 @@ jobs:
           WP_APP_PASSWORD=${{ secrets.WP_APP_PASSWORD }}
           WP_CONTACT_FORM_URL=${{ secrets.WP_CONTACT_FORM_URL }}
           WP_POST_STATUS=publish
+          GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
           DB_PATH=./data/subastas.db
           SELENIUM_HEADLESS=true
           REQUEST_TIMEOUT=30
