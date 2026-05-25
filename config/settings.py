@@ -20,11 +20,15 @@ LOG_DIR.mkdir(exist_ok=True)
 CACHE_DIR.mkdir(exist_ok=True)
 
 # WordPress REST API
-WP_URL = os.getenv("WP_URL", "https://comprarensubasta.com")
+WP_URL = os.getenv("WP_URL", "https://comprarensubasta.com").rstrip("/")
 WP_USER = os.getenv("WP_USER", "")
 WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
 WP_POST_STATUS = os.getenv("WP_POST_STATUS", "publish")
-WP_CONTACT_FORM_URL = os.getenv("WP_CONTACT_FORM_URL", "https://comprarensubasta.com/#analisis")
+WP_CONTACT_FORM_URL = os.getenv("WP_CONTACT_FORM_URL", f"{WP_URL}/#analisis")
+
+# Branding (usado en schema markup, og:site_name, copy SEO, etc.)
+BRAND_NAME = os.getenv("BRAND_NAME", "CAFAVE INVESTMENT")
+SITE_NAME = os.getenv("SITE_NAME", "Comprar en Subasta")
 
 # Base de datos
 DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "subastas.db"))
