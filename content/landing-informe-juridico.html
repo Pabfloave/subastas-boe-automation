@@ -1,0 +1,747 @@
+<!--
+  Landing: Informe Jurídico de Viabilidad de Subasta
+  URL destino: https://comprarensubasta.com/informe-juridico-subasta/
+  Pegar dentro de una página WordPress nueva (editor de bloques: bloque HTML personalizado)
+  o publicar vía WP REST API con post_type=page y slug=informe-juridico-subasta.
+
+  Notas:
+  - El form WPForms id=43 se inserta vía shortcode [wpforms id="43"]. Si pegas este HTML en
+    el editor Gutenberg de WP, el shortcode se renderiza automáticamente.
+  - El query string de la subasta original (id_subasta, provincia, etc.) se captura en JS
+    al cargar la página y se inyecta en campos ocultos del form, además de en el resumen
+    contextual del CTA final.
+-->
+
+<!-- ============== SCHEMA.ORG JSON-LD ============== -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "serviceType": "Informe Jurídico de Viabilidad de Subasta Judicial",
+  "name": "Informe Jurídico de Viabilidad de Subasta",
+  "description": "Análisis legal completo de una subasta judicial publicada en el BOE: cargas registrales, hoja de ruta procesal, proyección de costes, valoración orientativa, estudio de ocupación y riesgos. Entrega en 24 horas hábiles.",
+  "provider": {
+    "@type": "LegalService",
+    "name": "CAFAVE INVESTMENT",
+    "url": "https://comprarensubasta.com",
+    "areaServed": {
+      "@type": "Country",
+      "name": "España"
+    }
+  },
+  "areaServed": {
+    "@type": "Country",
+    "name": "España"
+  },
+  "offers": {
+    "@type": "Offer",
+    "name": "Informe Jurídico de Viabilidad de Subasta",
+    "price": "72.60",
+    "priceCurrency": "EUR",
+    "priceValidUntil": "2026-12-31",
+    "availability": "https://schema.org/InStock",
+    "url": "https://comprarensubasta.com/informe-juridico-subasta/",
+    "itemOffered": {
+      "@type": "Service",
+      "name": "Informe Jurídico de Viabilidad de Subasta"
+    }
+  }
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿Es obligatorio el informe jurídico para pujar en una subasta judicial?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No es legalmente obligatorio, pero sí altamente recomendable. La Ley de Enjuiciamiento Civil (LEC) presume que el postor conoce el estado de cargas del inmueble (art. 668 LEC). Si pujas sin haber revisado el certificado de cargas y existe una hipoteca anterior no cancelada, deberás asumirla tras la adjudicación."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué pasa si la subasta se cancela o se suspende?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "El informe se entrega en cualquier caso, ya que el trabajo de análisis se ejecuta antes de la fecha de subasta. Si la subasta se suspende después de entregado el informe, sigue siendo válido cuando se reanude (las cargas y el estado posesorio rara vez cambian en plazos cortos). Si la cancelación se produce antes de que iniciemos el análisis, devolvemos el 100% del importe."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Puedo pedir el informe después de pujar?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Técnicamente sí, pero pierde gran parte de su utilidad. El propósito del informe es decidir si pujar y a qué precio máximo. Si ya has pujado y resultas adjudicatario, el informe sirve para anticipar los costes post-adjudicación (ITP/AJD, lanzamiento, registro), pero ya no podrás retirar la puja."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Hay descuento por volumen si pido varios informes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sí. A partir del tercer informe en un mismo trimestre aplicamos un 15% de descuento. Inversores institucionales o fondos que soliciten más de 10 informes al mes pueden acceder a tarifas plana. Contáctanos para una propuesta a medida."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿En cuánto tiempo recibo el informe?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "El plazo estándar es de 24 horas hábiles desde la recepción del ID BOE de la subasta y el pago. En urgencias (subastas que finalizan en menos de 48h) ofrecemos servicio express con entrega en 6 horas hábiles, con un recargo del 50% sobre el precio base."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿El informe incluye visita al inmueble?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "El informe base no incluye visita física (en subastas judiciales el inmueble suele estar ocupado y no es accesible). Sí incluye consulta catastral, vista de fachada mediante Street View, certificado registral actualizado y estudio del estado posesorio. Si requieres visita presencial o informe pericial técnico, lo cotizamos aparte."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Quién firma el informe?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Todos los informes están firmados por un abogado colegiado en ejercicio, especializado en derecho procesal civil y subastas judiciales. Incluyen número de colegiación y sello profesional. Sirven como prueba documental ante terceros si fuera necesario."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Cubrís subastas notariales además de judiciales?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sí. Analizamos subastas judiciales, notariales y administrativas publicadas en el BOE. La estructura del informe es la misma, aunque cambian los marcos normativos aplicables (LEC para judiciales, Ley del Notariado para notariales, Ley General Tributaria para Hacienda y TGSS)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué pasa si después detectamos una carga que no estaba en vuestro informe?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Aplicamos garantía de devolución íntegra: si después de la adjudicación aparece una carga registral inscrita a fecha de nuestro análisis que no aparece reflejada en el informe, devolvemos el 100% del importe del informe. La garantía cubre cargas registralmente inscritas; no cubre cargas posteriores, ocupaciones de hecho o gravámenes fiscales sobrevenidos."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Puedo contratar también la representación en la puja?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sí. Tras la entrega del informe, si decides pujar puedes contratar nuestro servicio de representación procesal (depósito del 5%, gestión de la puja electrónica en el Portal del BOE, seguimiento hasta la adjudicación o devolución del depósito). El presupuesto se cierra a éxito en función del valor del lote."
+      }
+    }
+  ]
+}
+</script>
+
+<!-- ============== ESTILOS DE LA LANDING ============== -->
+<style>
+.lij-landing {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #1f2937;
+  line-height: 1.6;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.lij-landing h1, .lij-landing h2, .lij-landing h3 {
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- HERO ---------- */
+.lij-hero {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%);
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 60px 40px;
+  margin: 30px 0 50px;
+  position: relative;
+  overflow: hidden;
+}
+.lij-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 50%);
+  pointer-events: none;
+}
+.lij-hero-content { position: relative; z-index: 2; max-width: 720px; }
+.lij-hero h1 {
+  color: #ffffff;
+  font-size: 2.4em;
+  line-height: 1.15;
+  margin: 0 0 20px;
+}
+.lij-hero .lij-subtitle {
+  font-size: 1.2em;
+  opacity: 0.92;
+  margin: 0 0 30px;
+}
+.lij-price-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  background: #fbbf24;
+  color: #78350f;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1.15em;
+  margin-bottom: 30px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+.lij-price-badge .lij-price { font-size: 1.4em; }
+.lij-price-badge .lij-price-iva { font-size: 0.8em; opacity: 0.8; font-weight: 500; }
+.lij-cta-primary {
+  display: inline-block;
+  background: #f59e0b;
+  color: #ffffff !important;
+  padding: 18px 36px;
+  border-radius: 10px;
+  text-decoration: none !important;
+  font-weight: 700;
+  font-size: 1.1em;
+  box-shadow: 0 8px 24px rgba(245,158,11,0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.lij-cta-primary:hover {
+  background: #d97706;
+  color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(245,158,11,0.5);
+}
+.lij-hero-trust {
+  margin-top: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 0.95em;
+  opacity: 0.9;
+}
+.lij-hero-trust span::before { content: "✓ "; color: #fbbf24; font-weight: 700; }
+
+/* ---------- SECCIONES GENERICAS ---------- */
+.lij-section { margin: 60px 0; }
+.lij-section h2 {
+  font-size: 1.85em;
+  margin: 0 0 12px;
+  text-align: center;
+}
+.lij-section-lead {
+  text-align: center;
+  color: #64748b;
+  font-size: 1.1em;
+  max-width: 720px;
+  margin: 0 auto 40px;
+}
+
+/* ---------- QUÉ INCLUYE (grid) ---------- */
+.lij-incluye-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+.lij-incluye-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 28px 24px;
+  background: #ffffff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.lij-incluye-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(15,23,42,0.08);
+}
+.lij-incluye-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6em;
+  margin-bottom: 18px;
+}
+.lij-incluye-card h3 {
+  font-size: 1.15em;
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+.lij-incluye-card p { margin: 0; color: #475569; font-size: 0.97em; }
+
+/* ---------- CÓMO FUNCIONA ---------- */
+.lij-pasos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  counter-reset: paso;
+}
+.lij-paso {
+  text-align: center;
+  padding: 30px 20px;
+  background: #f8fafc;
+  border-radius: 14px;
+  position: relative;
+  counter-increment: paso;
+}
+.lij-paso::before {
+  content: counter(paso);
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lij-paso h3 { font-size: 1.05em; margin: 10px 0 8px; }
+.lij-paso p { font-size: 0.95em; color: #475569; margin: 0; }
+
+/* ---------- GARANTÍA ---------- */
+.lij-garantia {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #10b981;
+  border-radius: 16px;
+  padding: 40px;
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+.lij-garantia-badge {
+  flex-shrink: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
+  box-shadow: 0 8px 24px rgba(16,185,129,0.25);
+}
+.lij-garantia h2 {
+  text-align: left;
+  font-size: 1.5em;
+  margin: 0 0 10px;
+  color: #065f46;
+}
+.lij-garantia p { color: #047857; margin: 0; font-size: 1.02em; }
+
+/* ---------- MUESTRA ---------- */
+.lij-muestra {
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 50px 40px;
+  text-align: center;
+}
+.lij-muestra h2 { color: #ffffff; }
+.lij-muestra p { color: #cbd5e1; max-width: 640px; margin: 0 auto 28px; }
+.lij-muestra-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  color: #0f172a !important;
+  padding: 14px 26px;
+  border-radius: 8px;
+  text-decoration: none !important;
+  font-weight: 600;
+  transition: transform 0.15s ease;
+}
+.lij-muestra-cta:hover { transform: translateY(-2px); }
+
+/* ---------- TRUST ---------- */
+.lij-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 24px;
+  text-align: center;
+}
+.lij-trust-stat {
+  padding: 26px 18px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+.lij-trust-stat .lij-stat-number {
+  font-size: 2.2em;
+  font-weight: 700;
+  color: #2563eb;
+  display: block;
+  margin-bottom: 6px;
+}
+.lij-trust-stat .lij-stat-label { color: #64748b; font-size: 0.95em; }
+
+/* ---------- FAQ ---------- */
+.lij-faq { max-width: 820px; margin: 0 auto; }
+.lij-faq details {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: #ffffff;
+  transition: box-shadow 0.15s ease;
+}
+.lij-faq details[open] { box-shadow: 0 6px 18px rgba(15,23,42,0.06); }
+.lij-faq summary {
+  cursor: pointer;
+  padding: 18px 22px;
+  font-weight: 600;
+  color: #0f172a;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.lij-faq summary::-webkit-details-marker { display: none; }
+.lij-faq summary::after { content: "+"; font-size: 1.6em; color: #2563eb; font-weight: 300; }
+.lij-faq details[open] summary::after { content: "−"; }
+.lij-faq details p { padding: 0 22px 20px; margin: 0; color: #475569; }
+
+/* ---------- CTA FINAL ---------- */
+.lij-cta-final {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 16px;
+  padding: 50px 40px;
+  margin: 60px 0;
+}
+.lij-cta-final h2 { text-align: center; color: #78350f; margin-bottom: 14px; }
+.lij-cta-final-lead { text-align: center; color: #92400e; max-width: 640px; margin: 0 auto 30px; }
+.lij-context-resumen {
+  display: none;
+  background: rgba(255,255,255,0.7);
+  border-left: 4px solid #f59e0b;
+  padding: 14px 18px;
+  border-radius: 0 8px 8px 0;
+  margin: 0 auto 30px;
+  max-width: 640px;
+  font-size: 0.95em;
+  color: #78350f;
+}
+.lij-context-resumen.lij-show { display: block; }
+.lij-context-resumen .lij-context-item { margin-right: 14px; }
+.lij-context-resumen .lij-context-item strong { margin-right: 4px; }
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 720px) {
+  .lij-hero { padding: 40px 24px; }
+  .lij-hero h1 { font-size: 1.85em; }
+  .lij-garantia { flex-direction: column; text-align: center; }
+  .lij-garantia h2 { text-align: center; }
+}
+</style>
+
+<!-- ============== CONTENIDO LANDING ============== -->
+<article class="lij-landing">
+
+  <!-- BREADCRUMBS -->
+  <nav class="breadcrumbs" aria-label="Breadcrumb" style="font-size:0.85em;color:#6b7280;margin:20px 0;">
+    <span><a href="/" style="color:#2563eb;text-decoration:none;">Inicio</a></span>
+    &rsaquo;
+    <span><a href="/servicios/" style="color:#2563eb;text-decoration:none;">Servicios</a></span>
+    &rsaquo;
+    <span>Informe Jurídico de Viabilidad</span>
+  </nav>
+
+  <!-- 1. HERO -->
+  <section class="lij-hero">
+    <div class="lij-hero-content">
+      <div class="lij-price-badge">
+        <span class="lij-price">72,60 €</span>
+        <span class="lij-price-iva">IVA incluido</span>
+      </div>
+      <h1>Informe Jurídico de Viabilidad de Subasta · 72,60&nbsp;€</h1>
+      <p class="lij-subtitle">Análisis legal completo de la subasta que te interesa, entregado en <strong>24h hábiles</strong>. Cargas registrales, hoja de ruta procesal, riesgos detectados y proyección de costes antes de que pujes.</p>
+      <a href="#cta-final" class="lij-cta-primary">Solicitar Informe</a>
+      <div class="lij-hero-trust">
+        <span>Firmado por abogado colegiado</span>
+        <span>Garantía de devolución</span>
+        <span>Entrega 24h hábiles</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. QUÉ INCLUYE -->
+  <section class="lij-section" id="que-incluye">
+    <h2>Qué incluye tu informe jurídico</h2>
+    <p class="lij-section-lead">No es un check-list genérico. Cada informe se redacta a medida sobre la subasta que tú nos envías, con datos verificados frente al Registro de la Propiedad, el Catastro y el expediente del BOE.</p>
+
+    <div class="lij-incluye-grid">
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">📋</div>
+        <h3>Auditoría de cargas registrales</h3>
+        <p>Solicitamos certificación registral actualizada y analizamos hipotecas anteriores, embargos, servidumbres y afecciones fiscales según Ley Hipotecaria y arts. 668-671 LEC. Distinguimos cargas que se extinguen tras la adjudicación de las que subsisten.</p>
+      </div>
+
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">🗺️</div>
+        <h3>Hoja de ruta procesal completa</h3>
+        <p>Mapa paso a paso desde el depósito del 5% hasta la inscripción en el Registro: plazos legales, fechas críticas, recursos disponibles, requisitos de cesión de remate y particularidades del juzgado.</p>
+      </div>
+
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">💰</div>
+        <h3>Proyección de costes total</h3>
+        <p>Cálculo del coste real de la operación: ITP/AJD según comunidad autónoma, honorarios procurador y abogado, tasas registrales, IBI atrasados afectos al inmueble y costes estimados de lanzamiento si procede.</p>
+      </div>
+
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">📊</div>
+        <h3>Valoración pericial orientativa</h3>
+        <p>Comparable de mercado a partir de testigos en zona (Idealista, Fotocasa, valor catastral, último valor de tasación si está disponible). Te damos un rango de precio máximo recomendado para tu puja.</p>
+      </div>
+
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">🏠</div>
+        <h3>Estudio de ocupación y posesión</h3>
+        <p>Verificación del estado posesorio: vivienda habitual del ejecutado, inquilinos con contrato anterior al embargo, ocupación sin título. Te explicamos qué procedimiento de lanzamiento aplica y su coste y plazos.</p>
+      </div>
+
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">⚠️</div>
+        <h3>Riesgos detectados y mitigaciones</h3>
+        <p>Listado priorizado de banderas rojas: deudas con comunidad de propietarios afectas al inmueble, expedientes urbanísticos, fuera de ordenación, IBI impagado, eficiencia energética obligatoria. Con la mitigación recomendada para cada una.</p>
+      </div>
+
+      <div class="lij-incluye-card">
+        <div class="lij-incluye-icon" aria-hidden="true">📞</div>
+        <h3>Sesión de consulta de 30 minutos</h3>
+        <p>Una vez entregado el PDF, agendamos videollamada o llamada telefónica con el abogado responsable para resolver tus dudas y ayudarte a decidir si pujar y a qué precio máximo.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. CÓMO FUNCIONA -->
+  <section class="lij-section" id="como-funciona">
+    <h2>Cómo funciona</h2>
+    <p class="lij-section-lead">Cuatro pasos, sin papeleo, sin desplazamientos. Todo el proceso es online y la entrega del informe es íntegra en PDF firmado digitalmente.</p>
+
+    <div class="lij-pasos">
+      <div class="lij-paso">
+        <h3>Tú nos envías el ID BOE</h3>
+        <p>Rellena el formulario con el identificador de la subasta (lo encuentras en la URL del BOE o en nuestra ficha de la subasta). Pago seguro por tarjeta o transferencia.</p>
+      </div>
+      <div class="lij-paso">
+        <h3>Análisis en 24h hábiles</h3>
+        <p>Solicitamos certificación registral, revisamos el expediente, cruzamos catastro y BOE, y redactamos el informe. Sin coste extra ni sorpresas.</p>
+      </div>
+      <div class="lij-paso">
+        <h3>Recibes PDF + sesión</h3>
+        <p>Te enviamos el informe firmado por correo electrónico y agendamos la consulta de 30 minutos para resolver dudas concretas sobre tu caso.</p>
+      </div>
+      <div class="lij-paso">
+        <h3>Decides pujar con seguridad</h3>
+        <p>Con el informe en la mano, tienes claros los riesgos, el precio máximo y la hoja de ruta. Si decides pujar, podemos representarte en el portal BOE.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. GARANTÍA -->
+  <section class="lij-section" id="garantia">
+    <div class="lij-garantia">
+      <div class="lij-garantia-badge" aria-hidden="true">🛡️</div>
+      <div>
+        <h2>Garantía de devolución íntegra</h2>
+        <p>Si tras la adjudicación detectamos una <strong>carga registralmente inscrita</strong> a la fecha de nuestro análisis que <strong>no aparece reflejada en el informe</strong>, te devolvemos el 100% del importe del informe. Sin preguntas, sin letras pequeñas. Nuestro trabajo es que no haya sorpresas.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. MUESTRA -->
+  <section class="lij-section" id="muestra">
+    <div class="lij-muestra">
+      <h2>Mira un informe real</h2>
+      <p>Descarga una muestra anonimizada de un informe entregado a un cliente real (datos personales, dirección exacta y referencias procesales sustituidos). Verás el nivel de detalle antes de contratar.</p>
+      <a href="https://comprarensubasta.com/wp-content/uploads/2026/05/muestra-informe-juridico-subasta.pdf" class="lij-muestra-cta" target="_blank" rel="nofollow">
+        <span>📄</span> Descargar muestra (PDF, 42&nbsp;KB · 11 páginas)
+      </a>
+    </div>
+  </section>
+
+  <!-- 6. TRUST SIGNALS -->
+  <section class="lij-section" id="trust">
+    <h2>Por qué confiar en nosotros</h2>
+    <p class="lij-section-lead">CAFAVE INVESTMENT es la marca de servicios jurídicos del despacho. Llevamos más de una década gestionando subastas judiciales en toda España.</p>
+
+    <div class="lij-trust-grid">
+      <div class="lij-trust-stat">
+        <span class="lij-stat-number">12+</span>
+        <span class="lij-stat-label">años especializados en subastas BOE</span>
+      </div>
+      <div class="lij-trust-stat">
+        <span class="lij-stat-number">1.400+</span>
+        <span class="lij-stat-label">informes entregados a inversores</span>
+      </div>
+      <div class="lij-trust-stat">
+        <span class="lij-stat-number">52</span>
+        <span class="lij-stat-label">provincias cubiertas en toda España</span>
+      </div>
+    </div>
+
+    <p style="text-align:center;margin-top:30px;color:#475569;font-size:0.95em;">
+      Despacho colegiado en el <strong>Ilustre Colegio de Abogados de Sevilla (ICAS)</strong>. Equipo de abogados especializados en derecho procesal civil y subastas judiciales. Seguro de responsabilidad civil profesional con cobertura nacional.
+    </p>
+
+  </section>
+
+  <!-- 7. FAQ -->
+  <section class="lij-section" id="faq">
+    <h2>Preguntas frecuentes</h2>
+    <p class="lij-section-lead">Lo que normalmente preguntan los inversores antes de contratar.</p>
+
+    <div class="lij-faq">
+      <details>
+        <summary>¿Es obligatorio el informe jurídico para pujar en una subasta judicial?</summary>
+        <p>No es legalmente obligatorio, pero sí altamente recomendable. La Ley de Enjuiciamiento Civil (LEC) presume que el postor conoce el estado de cargas del inmueble (art. 668 LEC). Si pujas sin haber revisado el certificado de cargas y existe una hipoteca anterior no cancelada, deberás asumirla tras la adjudicación.</p>
+      </details>
+
+      <details>
+        <summary>¿Qué pasa si la subasta se cancela o se suspende?</summary>
+        <p>El informe se entrega en cualquier caso, ya que el trabajo de análisis se ejecuta antes de la fecha de subasta. Si la subasta se suspende después de entregado el informe, sigue siendo válido cuando se reanude (las cargas y el estado posesorio rara vez cambian en plazos cortos). Si la cancelación se produce antes de que iniciemos el análisis, devolvemos el 100% del importe.</p>
+      </details>
+
+      <details>
+        <summary>¿Puedo pedir el informe después de pujar?</summary>
+        <p>Técnicamente sí, pero pierde gran parte de su utilidad. El propósito del informe es decidir si pujar y a qué precio máximo. Si ya has pujado y resultas adjudicatario, el informe sirve para anticipar los costes post-adjudicación (ITP/AJD, lanzamiento, registro), pero ya no podrás retirar la puja.</p>
+      </details>
+
+      <details>
+        <summary>¿Hay descuento por volumen si pido varios informes?</summary>
+        <p>Sí. A partir del tercer informe en un mismo trimestre aplicamos un 15% de descuento. Inversores institucionales o fondos que soliciten más de 10 informes al mes pueden acceder a tarifas plana. Contáctanos para una propuesta a medida.</p>
+      </details>
+
+      <details>
+        <summary>¿En cuánto tiempo recibo el informe?</summary>
+        <p>El plazo estándar es de 24 horas hábiles desde la recepción del ID BOE de la subasta y el pago. En urgencias (subastas que finalizan en menos de 48h) ofrecemos servicio express con entrega en 6 horas hábiles, con un recargo del 50% sobre el precio base.</p>
+      </details>
+
+      <details>
+        <summary>¿El informe incluye visita al inmueble?</summary>
+        <p>El informe base no incluye visita física (en subastas judiciales el inmueble suele estar ocupado y no es accesible). Sí incluye consulta catastral, vista de fachada mediante Street View, certificado registral actualizado y estudio del estado posesorio. Si requieres visita presencial o informe pericial técnico, lo cotizamos aparte.</p>
+      </details>
+
+      <details>
+        <summary>¿Quién firma el informe?</summary>
+        <p>Todos los informes están firmados por un abogado colegiado en ejercicio, especializado en derecho procesal civil y subastas judiciales. Incluyen número de colegiación y sello profesional. Sirven como prueba documental ante terceros si fuera necesario.</p>
+      </details>
+
+      <details>
+        <summary>¿Cubrís subastas notariales además de judiciales?</summary>
+        <p>Sí. Analizamos subastas judiciales, notariales y administrativas publicadas en el BOE. La estructura del informe es la misma, aunque cambian los marcos normativos aplicables (LEC para judiciales, Ley del Notariado para notariales, Ley General Tributaria para Hacienda y TGSS).</p>
+      </details>
+
+      <details>
+        <summary>¿Qué pasa si después detectamos una carga que no estaba en vuestro informe?</summary>
+        <p>Aplicamos garantía de devolución íntegra: si después de la adjudicación aparece una carga registral inscrita a fecha de nuestro análisis que no aparece reflejada en el informe, devolvemos el 100% del importe del informe. La garantía cubre cargas registralmente inscritas; no cubre cargas posteriores, ocupaciones de hecho o gravámenes fiscales sobrevenidos.</p>
+      </details>
+
+      <details>
+        <summary>¿Puedo contratar también la representación en la puja?</summary>
+        <p>Sí. Tras la entrega del informe, si decides pujar puedes contratar nuestro servicio de representación procesal (depósito del 5%, gestión de la puja electrónica en el Portal del BOE, seguimiento hasta la adjudicación o devolución del depósito). El presupuesto se cierra a éxito en función del valor del lote.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- 8. CTA FINAL CON FORM -->
+  <section class="lij-section lij-cta-final" id="cta-final">
+    <h2>Pídenos el informe de TU subasta</h2>
+    <p class="lij-cta-final-lead">Rellena el formulario con el ID BOE de la subasta que te interesa. Te contactamos en menos de 4 horas hábiles para confirmar el alcance y enviarte el enlace de pago.</p>
+
+    <!-- Resumen contextual: el JS lo rellena con createElement/textContent (sin innerHTML) -->
+    <div class="lij-context-resumen" id="lij-context-resumen" aria-live="polite">
+      <strong>Solicitas informe para esta subasta:</strong>
+      <div id="lij-context-detalle"></div>
+    </div>
+
+    <!-- WPForms shortcode: WP lo procesa al renderizar la página -->
+    [wpforms id="43" title="false" description="false"]
+  </section>
+
+</article>
+
+<!-- ============== CAPTURA QUERY STRING -> CONTEXTO + CAMPOS OCULTOS ============== -->
+<script>
+(function() {
+  // Captura los parámetros que ya envían las fichas de subasta:
+  // subasta, tipo, localidad, provincia
+  var params = new URLSearchParams(window.location.search);
+  var subasta   = params.get('subasta');
+  var tipo      = params.get('tipo');
+  var localidad = params.get('localidad');
+  var provincia = params.get('provincia');
+
+  if (!subasta && !tipo && !localidad && !provincia) return;
+
+  // 1) Inyectar resumen contextual visible, usando DOM safe methods (no innerHTML)
+  var resumen = document.getElementById('lij-context-resumen');
+  var detalle = document.getElementById('lij-context-detalle');
+  if (resumen && detalle) {
+    var pairs = [
+      ['ID BOE',    subasta],
+      ['Tipo',      tipo],
+      ['Localidad', localidad],
+      ['Provincia', provincia]
+    ];
+    pairs.forEach(function(p, idx) {
+      if (!p[1]) return;
+      var item = document.createElement('span');
+      item.className = 'lij-context-item';
+      var label = document.createElement('strong');
+      label.textContent = p[0] + ':';
+      var value = document.createTextNode(' ' + p[1]);
+      item.appendChild(label);
+      item.appendChild(value);
+      detalle.appendChild(item);
+      // Separador visual entre items (excepto el último relleno)
+      if (idx < pairs.length - 1) {
+        detalle.appendChild(document.createTextNode(' · '));
+      }
+    });
+    resumen.classList.add('lij-show');
+  }
+
+  // 2) Rellenar campos del formulario WPForms (best-effort: si los campos del form
+  //    tienen name/id que contiene "subasta", "tipo", "localidad" o "provincia",
+  //    los pre-rellenamos; si no, el contexto sigue llegando por el referer + textarea).
+  //    WPForms suele renderizar el shortcode en window 'load'.
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      tryFill('input[name*="subasta"], input[id*="subasta"]', subasta);
+      tryFill('input[name*="tipo"], input[id*="tipo"]',         tipo);
+      tryFill('input[name*="localidad"], input[id*="localidad"]', localidad);
+      tryFill('input[name*="provincia"], input[id*="provincia"]', provincia);
+
+      // Si el form tiene un textarea de mensaje/comentarios y está vacío,
+      // pre-rellenamos con un resumen de la subasta.
+      var textareas = document.querySelectorAll('.lij-cta-final textarea');
+      if (textareas.length && !textareas[0].value) {
+        var lineas = ['Solicito informe jurídico para la siguiente subasta:'];
+        if (subasta)   lineas.push('ID BOE: ' + subasta);
+        if (tipo)      lineas.push('Tipo: ' + tipo);
+        if (localidad) lineas.push('Localidad: ' + localidad);
+        if (provincia) lineas.push('Provincia: ' + provincia);
+        if (lineas.length > 1) textareas[0].value = lineas.join('\n');
+      }
+    }, 400);
+  });
+
+  function tryFill(selector, value) {
+    if (!value) return;
+    var nodes = document.querySelectorAll('.lij-cta-final ' + selector);
+    nodes.forEach(function(n) { if (!n.value) n.value = value; });
+  }
+})();
+</script>
