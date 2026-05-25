@@ -20,6 +20,66 @@ from config.provinces import get_provincia_nombre, get_provincia_slug
 logger = logging.getLogger(__name__)
 
 
+# JS para el sticky CTA contextual de las fichas de subasta.
+# - Aparece tras 30% de scroll (evita flash inicial)
+# - Botón cerrar persiste el dismiss en localStorage durante 1h
+# Se inyecta una sola vez por post desde _generate_content.
+STICKY_CTA_SCRIPT = """
+<script>
+(function () {
+    var STORAGE_KEY = 'sticky_cta_subasta_dismissed_at';
+    var DISMISS_MS = 60 * 60 * 1000; // 1h
+    var SCROLL_TRIGGER_PCT = 0.30;
+
+    function onReady(fn) {
+        if (document.readyState !== 'loading') { fn(); return; }
+        document.addEventListener('DOMContentLoaded', fn);
+    }
+
+    onReady(function () {
+        var el = document.getElementById('sticky-cta-subasta');
+        if (!el) return;
+
+        // Respetar dismiss previo (mismo dispositivo, dentro de 1h)
+        try {
+            var dismissedAt = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+            if (dismissedAt && (Date.now() - dismissedAt < DISMISS_MS)) return;
+        } catch (e) { /* localStorage bloqueado: ignorar y seguir */ }
+
+        var shown = false;
+        function maybeShow() {
+            if (shown) return;
+            var scrolled = window.scrollY || window.pageYOffset || 0;
+            var docHeight = Math.max(
+                document.body.scrollHeight,
+                document.documentElement.scrollHeight
+            ) - window.innerHeight;
+            if (docHeight <= 0) return;
+            if (scrolled / docHeight >= SCROLL_TRIGGER_PCT) {
+                el.classList.add('visible');
+                document.body.classList.add('has-sticky-cta-subasta');
+                shown = true;
+                window.removeEventListener('scroll', maybeShow);
+            }
+        }
+
+        window.addEventListener('scroll', maybeShow, { passive: true });
+        maybeShow();
+
+        var closeBtn = el.querySelector('[data-sticky-cta-close]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+                el.classList.remove('visible');
+                document.body.classList.remove('has-sticky-cta-subasta');
+                try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch (e) {}
+            });
+        }
+    });
+})();
+</script>
+"""
+
+
 class WordPressPublisher:
     """Publica subastas en WordPress."""
 
@@ -618,6 +678,100 @@ class WordPressPublisher:
     color: #b45309;
     font-size: 1.1em;
 }
+
+/* Sticky CTA - Informe jurídico contextual (Quick Win #2 SEO 2026) */
+.sticky-cta-subasta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 2px solid #1e40af;
+    padding: 12px 16px;
+    z-index: 9999;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    display: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.sticky-cta-subasta.visible {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    animation: stickyCtaSlideUp 0.3s ease-out;
+}
+@keyframes stickyCtaSlideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+.sticky-cta-subasta__info {
+    flex: 1;
+    min-width: 0;
+}
+.sticky-cta-subasta__title {
+    font-weight: 600;
+    color: #1e40af;
+    font-size: 0.95em;
+    margin: 0 0 2px 0;
+    line-height: 1.3;
+}
+.sticky-cta-subasta__meta {
+    font-size: 0.8em;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sticky-cta-subasta__btn {
+    display: inline-block;
+    background: #1e40af;
+    color: white !important;
+    padding: 10px 18px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9em;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+.sticky-cta-subasta__btn:hover {
+    background: #1e3a8a;
+    color: white !important;
+}
+.sticky-cta-subasta__close {
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 0 6px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.sticky-cta-subasta__close:hover {
+    color: #1f2937;
+}
+@media (max-width: 640px) {
+    .sticky-cta-subasta {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+    .sticky-cta-subasta__title {
+        font-size: 0.85em;
+    }
+    .sticky-cta-subasta__meta {
+        font-size: 0.72em;
+    }
+    .sticky-cta-subasta__btn {
+        padding: 9px 12px;
+        font-size: 0.82em;
+    }
+    /* Padding inferior al body para no tapar contenido tras el footer */
+    body.has-sticky-cta-subasta { padding-bottom: 80px; }
+}
 </style>
 """
 
@@ -938,7 +1092,7 @@ class WordPressPublisher:
             <li>Gestión post-adjudicación y escrituración</li>
         </ul>
         <p><strong>Primera consulta gratuita</strong> - Te explicamos si esta subasta es una buena oportunidad.</p>
-        <a href="{self.contact_url}?subasta={urllib.parse.quote(subasta.id_subasta)}&tipo={urllib.parse.quote(tipo_bien)}&localidad={urllib.parse.quote(localidad)}&provincia={urllib.parse.quote(provincia)}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
+        <a href="{self.contact_url}?subasta={urllib.parse.quote(subasta.id_subasta)}&tipo={urllib.parse.quote(tipo_bien)}&localidad={urllib.parse.quote(localidad)}&provincia={urllib.parse.quote(provincia)}&utm_source=ficha_body" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
             Solicitar Análisis Gratuito
         </a>
     </div>
@@ -960,7 +1114,22 @@ class WordPressPublisher:
     </div>
 
 </div>
+
+<!-- Sticky CTA - Informe jurídico contextual (Quick Win #2 SEO 2026) -->
+<aside class="sticky-cta-subasta" id="sticky-cta-subasta" role="complementary" aria-label="Solicitar informe jurídico de esta subasta">
+    <div class="sticky-cta-subasta__info">
+        <p class="sticky-cta-subasta__title">📄 Informe jurídico de ESTE activo · 72,60€ · 48h</p>
+        <p class="sticky-cta-subasta__meta">{subasta.id_subasta} · {tipo_bien} en {localidad}</p>
+    </div>
+    <a href="{self.contact_url}?subasta={urllib.parse.quote(subasta.id_subasta)}&tipo={urllib.parse.quote(tipo_bien)}&localidad={urllib.parse.quote(localidad)}&provincia={urllib.parse.quote(provincia)}&utm_source=ficha_sticky#analisis"
+       class="sticky-cta-subasta__btn"
+       title="Solicitar informe jurídico de {tipo_bien} en {localidad}">
+        Solicitar informe &rarr;
+    </a>
+    <button type="button" class="sticky-cta-subasta__close" aria-label="Cerrar" data-sticky-cta-close>&times;</button>
+</aside>
 """
+        html += STICKY_CTA_SCRIPT
         return html
 
     def _get_categories(self, subasta: Subasta) -> List[int]:
