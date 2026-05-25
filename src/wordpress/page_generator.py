@@ -5,14 +5,45 @@ Soporta las 52 provincias de España.
 SEO optimizado: meta tags, Open Graph, JSON-LD, contenido estático indexable.
 """
 import json
+import sqlite3
 import requests
-from datetime import datetime
-from typing import Dict, Optional
+from datetime import datetime, timezone
+from typing import Dict, Optional, Tuple
 from config import settings
 from config.provinces import PROVINCIAS_ESPANA
 
 # Cache de IDs de categorías (se llena dinámicamente)
 _CATEGORIA_CACHE = {}
+
+# Nombres cortos para títulos SEO (<60 chars) cuando el oficial es muy largo
+PROVINCE_SHORT_NAME = {
+    "Santa Cruz de Tenerife": "S.C. Tenerife",
+}
+
+# ITP (Impuesto Transmisiones Patrimoniales) - tipo general por CCAA
+# para adjudicaciones de inmuebles en subasta. Algunas CCAA tienen
+# tipos reducidos para vivienda habitual; mostramos el tipo general.
+ITP_POR_CCAA = {
+    "Andalucía": "7%",
+    "Aragón": "8% (hasta 400.000€) - 8,5%/9%/10% en tramos superiores",
+    "Principado de Asturias": "8% (hasta 300.000€) - 9%/10% en tramos superiores",
+    "Islas Baleares": "8% (hasta 400.000€) - escalado hasta 13% en tramos superiores",
+    "Canarias": "6,5%",
+    "Cantabria": "9% (con tipos reducidos del 5%-7% para vivienda habitual)",
+    "Castilla-La Mancha": "9% (con bonificaciones para vivienda habitual)",
+    "Castilla y León": "8% (hasta 250.000€) - 10% en tramos superiores",
+    "Cataluña": "10% (hasta 1.000.000€) - 11% en tramos superiores",
+    "Comunidad de Madrid": "6%",
+    "Comunidad Valenciana": "10%",
+    "Extremadura": "8% (hasta 350.000€) - 10%/11% en tramos superiores",
+    "Galicia": "10% (8% para vivienda habitual hasta 150.000€)",
+    "La Rioja": "7%",
+    "Navarra": "6% (4% vivienda habitual hasta 180.304€)",
+    "Comunidad Foral de Navarra": "6% (4% vivienda habitual hasta 180.304€)",
+    "País Vasco": "4% (régimen foral - 2,5% vivienda habitual)",
+    "Región de Murcia": "8%",
+    "Ciudad Autónoma": "IPSI 0,5% (Ceuta/Melilla, sin ITP general)",
+}
 
 
 class ProvinciaPageGenerator:
@@ -68,9 +99,96 @@ class ProvinciaPageGenerator:
 
         return 0
 
+    def _get_provincia_stats(self, provincia_codigo: str) -> dict:
+        """
+        Consulta la BD para obtener datos dinámicos del FAQ:
+        - total_activas: número de subastas activas en la provincia
+        - juzgados: top 5 autoridades gestoras (lista de (nombre, count))
+        - proximas: próximas 5 subastas (lista de (fecha_iso, subtipo, localidad))
+
+        Devuelve defaults seguros si la BD no está disponible o no tiene datos
+        (las respuestas del FAQ usan fallbacks estáticos en ese caso).
+        """
+        stats = {"total_activas": 0, "juzgados": [], "proximas": []}
+        try:
+            conn = sqlite3.connect(settings.DB_PATH)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                SELECT COUNT(DISTINCT s.id_subasta)
+                FROM subastas s
+                JOIN bienes b ON s.id_subasta = b.id_subasta
+                WHERE b.provincia_codigo = ? AND s.activa = 1
+                """,
+                (provincia_codigo,),
+            )
+            row = cursor.fetchone()
+            stats["total_activas"] = (row[0] if row else 0) or 0
+
+            cursor.execute(
+                """
+                SELECT s.autoridad_gestora, COUNT(DISTINCT s.id_subasta) AS cnt
+                FROM subastas s
+                JOIN bienes b ON s.id_subasta = b.id_subasta
+                WHERE b.provincia_codigo = ? AND s.activa = 1
+                  AND s.autoridad_gestora IS NOT NULL AND s.autoridad_gestora != ''
+                GROUP BY s.autoridad_gestora
+                ORDER BY cnt DESC
+                LIMIT 5
+                """,
+                (provincia_codigo,),
+            )
+            stats["juzgados"] = [(r[0], r[1]) for r in cursor.fetchall()]
+
+            cursor.execute(
+                """
+                SELECT s.fecha_conclusion, b.subtipo_bien, b.localidad
+                FROM subastas s
+                JOIN bienes b ON s.id_subasta = b.id_subasta
+                WHERE b.provincia_codigo = ? AND s.activa = 1
+                  AND s.fecha_conclusion > datetime('now')
+                GROUP BY s.id_subasta
+                ORDER BY s.fecha_conclusion ASC
+                LIMIT 5
+                """,
+                (provincia_codigo,),
+            )
+            stats["proximas"] = [(r[0], r[1], r[2]) for r in cursor.fetchall()]
+
+            conn.close()
+        except sqlite3.Error:
+            pass
+        return stats
+
+    @staticmethod
+    def _build_meta_title(nombre: str, year: int, total_activas: int) -> str:
+        """Construye el <title> SEO con el formato '{Prov} {year} | {N} activos BOE actualizados'.
+
+        Aplica nombre corto para provincias con nombre largo y trunca de forma
+        progresiva si supera los 60 caracteres recomendados por Google.
+        """
+        nombre_corto = PROVINCE_SHORT_NAME.get(nombre, nombre)
+        if total_activas > 0:
+            full = (
+                f"Subastas Judiciales {nombre_corto} {year} | "
+                f"{total_activas} activos BOE actualizados"
+            )
+            if len(full) <= 60:
+                return full
+            shorter = (
+                f"Subastas Judiciales {nombre_corto} {year} | "
+                f"{total_activas} activos BOE"
+            )
+            if len(shorter) <= 60:
+                return shorter
+            return shorter[:60]
+        full = f"Subastas Judiciales {nombre_corto} {year} | Inmuebles BOE actualizados"
+        return full if len(full) <= 60 else f"Subastas Judiciales {nombre_corto} {year} | BOE"
+
     def _generate_province_seo_text(self, nombre: str, comunidad: str) -> str:
         """Genera texto SEO estático único para cada provincia."""
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         return f"""<section class="seo-content" itemscope itemtype="https://schema.org/Article">
     <h2>Subastas Judiciales en {nombre}: Oportunidades de Inversi\u00f3n Inmobiliaria {current_year}</h2>
     <p>Las <strong>subastas judiciales en {nombre}</strong> representan una de las mejores v\u00edas para adquirir inmuebles por debajo de su valor de mercado. A trav\u00e9s del <strong>Portal de Subastas del BOE</strong>, puede acceder a viviendas, locales comerciales, garajes y fincas r\u00fasticas embargadas en la provincia de {nombre} ({comunidad}) con descuentos que pueden alcanzar entre el 30% y el 60% sobre el precio de tasaci\u00f3n.</p>
@@ -95,34 +213,100 @@ class ProvinciaPageGenerator:
     </ol>
   </section>"""
 
-    def _generate_faq_section(self, nombre: str, comunidad: str) -> str:
-        """Genera sección FAQ con Schema markup para rich snippets."""
-        current_year = datetime.now().year
+    def _generate_faq_section(self, nombre: str, comunidad: str, stats: dict) -> Tuple[str, dict]:
+        """Genera sección FAQ con Schema markup FAQPage para rich snippets.
+
+        Pattern de 5 preguntas:
+          1. Cuántas subastas activas (dinámico)
+          2. Qué juzgados gestionan (dinámico, fallback estático si DB vacía)
+          3. ITP por CCAA (estático por comunidad)
+          4. Próximas subastas (dinámico, fallback estático si DB vacía)
+          5. Necesito abogado (estático con CTA al informe jurídico)
+        """
+        total = stats.get("total_activas", 0)
+        juzgados = stats.get("juzgados", [])
+        proximas = stats.get("proximas", [])
+        itp = ITP_POR_CCAA.get(comunidad, "consultar normativa autonómica vigente")
+
+        if total > 0:
+            q1_a = (
+                f"Actualmente hay <strong>{total} subastas judiciales activas en {nombre}</strong> "
+                f"publicadas en el Portal de Subastas del BOE. Este listado se actualiza diariamente "
+                f"con los nuevos procedimientos del Boletín Oficial del Estado. Puede consultar el "
+                f"listado completo en la parte superior de esta página."
+            )
+        else:
+            q1_a = (
+                f"El número de subastas judiciales activas en {nombre} varía cada día. "
+                f"Consulte el listado actualizado en la parte superior de esta página, "
+                f"sincronizado con el BOE cada 24 horas."
+            )
+
+        if juzgados:
+            items = "; ".join(f"{j[0]} ({j[1]} subastas)" for j in juzgados)
+            q2_a = (
+                f"En {nombre} las subastas judiciales son gestionadas principalmente por los siguientes "
+                f"juzgados: {items}. Cada subasta indica el juzgado responsable y el número de "
+                f"procedimiento en su ficha individual."
+            )
+        else:
+            q2_a = (
+                f"En {nombre}, las subastas judiciales civiles las tramitan los <strong>Juzgados de "
+                f"Primera Instancia e Instrucción</strong> del partido judicial correspondiente. Las "
+                f"subastas concursales corresponden al <strong>Juzgado de lo Mercantil</strong>. Cada "
+                f"anuncio del BOE identifica el juzgado y el número de procedimiento; consulte la ficha "
+                f"individual de cada subasta para conocer el juzgado competente."
+            )
+
+        q3_a = (
+            f"En {nombre} ({comunidad}) el <strong>Impuesto sobre Transmisiones Patrimoniales (ITP)</strong> "
+            f"aplicable a la adjudicación de inmuebles en subasta judicial es: <strong>{itp}</strong>. "
+            f"El ITP se devenga al adjudicarse el bien y se calcula sobre el precio de adjudicación "
+            f"(no sobre el valor de tasación). Algunas CCAA aplican tipos reducidos para vivienda "
+            f"habitual o jóvenes; conviene sumarlo al presupuesto de la inversión."
+        )
+
+        if proximas:
+            items_html = "<ul>"
+            for fecha_iso, subtipo, localidad in proximas:
+                try:
+                    fecha = datetime.fromisoformat(fecha_iso)
+                    fecha_fmt = fecha.strftime("%d/%m/%Y %H:%M")
+                except (ValueError, TypeError):
+                    fecha_fmt = fecha_iso or "Fecha por confirmar"
+                tipo = subtipo or "Inmueble"
+                loc = localidad or nombre
+                items_html += f"<li><strong>{fecha_fmt}</strong> — {tipo} en {loc}</li>"
+            items_html += "</ul>"
+            q4_a = (
+                f"Las próximas subastas que finalizan en {nombre} son: {items_html} "
+                f"Las subastas electrónicas del BOE duran 20 días naturales. Consulte el listado "
+                f"completo en la parte superior para más detalles."
+            )
+        else:
+            q4_a = (
+                f"Las subastas judiciales en {nombre} se publican y finalizan continuamente en el "
+                f"Portal de Subastas del BOE. Cada subasta electrónica permanece abierta durante "
+                f"20 días naturales. Consulte el listado actualizado en la parte superior de esta "
+                f"página para conocer las fechas de finalización de las subastas activas."
+            )
+
+        q5_a = (
+            f"No es legalmente obligatorio contar con abogado para pujar como particular en una "
+            f"subasta judicial en {nombre}, pero es <strong>muy recomendable</strong> realizar un "
+            f"análisis previo del expediente: cargas registrales, situación posesoria del inmueble, "
+            f"deudas con la comunidad de propietarios, derechos de tanteo y retracto, y la viabilidad "
+            f"jurídica de la adjudicación. Puede solicitar nuestro "
+            f'<a href="/informe-juridico-subasta/">informe jurídico de subasta</a> para un análisis '
+            f"profesional antes de pujar."
+        )
+
         faqs = [
-            {
-                "q": f"\u00bfC\u00f3mo puedo comprar un piso en subasta judicial en {nombre}?",
-                "a": f"Para comprar un piso en subasta judicial en {nombre}, debe registrarse en el Portal de Subastas del BOE (subastas.boe.es), depositar el 20% del valor de tasaci\u00f3n como garant\u00eda, y realizar su puja online durante los 20 d\u00edas que dura la subasta electr\u00f3nica. Le recomendamos contar con asesoramiento legal para analizar cargas y viabilidad."
-            },
-            {
-                "q": f"\u00bfQu\u00e9 dep\u00f3sito necesito para participar en subastas en {nombre}?",
-                "a": f"Desde la entrada en vigor de la nueva regulaci\u00f3n, el dep\u00f3sito para participar en subastas judiciales de inmuebles en {nombre} es del 20% del valor de tasaci\u00f3n, con un m\u00ednimo de 1.000\u20ac. Este dep\u00f3sito se realiza electr\u00f3nicamente a trav\u00e9s de la pasarela de pagos de la Agencia Tributaria."
-            },
-            {
-                "q": f"\u00bfEs seguro comprar en subasta judicial en {nombre}?",
-                "a": f"Comprar en subasta judicial en {nombre} es un procedimiento legal supervisado por el Juzgado. Sin embargo, es fundamental analizar las cargas registrales, la situaci\u00f3n posesoria (si el inmueble est\u00e1 ocupado) y posibles deudas con la comunidad de propietarios. Por eso recomendamos asesoramiento profesional antes de pujar."
-            },
-            {
-                "q": f"\u00bfCon qu\u00e9 frecuencia se publican nuevas subastas en {nombre}?",
-                "a": f"Las subastas judiciales en {nombre} se publican continuamente en el BOE. En CAFAVE INVESTMENT actualizamos nuestro listado cada 24 horas para que tenga acceso a las \u00faltimas oportunidades inmobiliarias publicadas en {comunidad}."
-            },
-            {
-                "q": f"\u00bfPuedo visitar el inmueble antes de pujar en una subasta en {nombre}?",
-                "a": "En la mayor\u00eda de subastas judiciales no es posible visitar el inmueble previamente. Por eso es crucial analizar la documentaci\u00f3n registral, catastral y el edicto judicial. Nuestro equipo puede realizar un an\u00e1lisis completo del inmueble y su entorno para minimizar riesgos."
-            },
-            {
-                "q": f"\u00bfQu\u00e9 descuentos puedo obtener en subastas judiciales de {nombre}?",
-                "a": f"Los inmuebles subastados en {nombre} pueden adquirirse con descuentos de entre el 30% y el 60% sobre el valor de mercado, dependiendo del tipo de bien, su ubicaci\u00f3n y el n\u00famero de postores. Las mejores oportunidades se encuentran en inmuebles con menor competencia de pujadores."
-            }
+            {"q": f"¿Cuántas subastas judiciales hay activas en {nombre}?", "a": q1_a},
+            {"q": f"¿Qué juzgados gestionan las subastas en {nombre}?", "a": q2_a},
+            {"q": f"¿Cuál es el ITP en {nombre} para inmuebles adjudicados en subasta?", "a": q3_a},
+            {"q": f"¿Cuándo se celebran las próximas subastas en {nombre}?", "a": q4_a},
+            {"q": f"¿Necesito un abogado para participar en subasta en {nombre}?", "a": q5_a},
         ]
 
         faq_schema = {
@@ -132,13 +316,10 @@ class ProvinciaPageGenerator:
                 {
                     "@type": "Question",
                     "name": faq["q"],
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": faq["a"]
-                    }
+                    "acceptedAnswer": {"@type": "Answer", "text": faq["a"]},
                 }
                 for faq in faqs
-            ]
+            ],
         }
 
         faq_html = '<section class="faq-section" itemscope itemtype="https://schema.org/FAQPage">\n'
@@ -148,18 +329,22 @@ class ProvinciaPageGenerator:
       <details class="faq-item">
         <summary itemprop="name">{faq["q"]}</summary>
         <div class="faq-answer" itemprop="acceptedAnswer" itemscope itemtype="https://schema.org/Answer">
-          <p itemprop="text">{faq["a"]}</p>
+          <div itemprop="text">{faq["a"]}</div>
         </div>
       </details>
-    </div>\n'''
+    </div>
+'''
         faq_html += '  </section>'
 
         return faq_html, faq_schema
 
-    def generate_page_content(self, provincia_codigo: str) -> str:
+    def generate_page_content(self, provincia_codigo: str, stats: Optional[dict] = None) -> str:
         """
         Genera el contenido HTML completo para una página de provincia.
         Optimizado para SEO: meta tags, Open Graph, JSON-LD, contenido estático indexable.
+
+        Acepta `stats` opcional para evitar un segundo SELECT a la BD cuando
+        `create_page` ya las consultó.
         """
         prov = PROVINCIAS_ESPANA.get(provincia_codigo)
         if not prov:
@@ -168,9 +353,13 @@ class ProvinciaPageGenerator:
         nombre = prov["nombre"]
         slug = prov["slug"]
         comunidad = prov.get("comunidad", "España")
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
         site_url = "https://comprarensubasta.com"
+
+        if stats is None:
+            stats = self._get_provincia_stats(provincia_codigo)
+        total_activas = stats.get("total_activas", 0)
 
         meta_description = (
             f"Subastas judiciales en {nombre} {current_year}. "
@@ -180,7 +369,7 @@ class ProvinciaPageGenerator:
         if len(meta_description) > 160:
             meta_description = meta_description[:157] + "..."
 
-        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
+        meta_title = self._build_meta_title(nombre, current_year, total_activas)
 
         # JSON-LD structured data
         breadcrumb_schema = {
@@ -217,11 +406,11 @@ class ProvinciaPageGenerator:
                 "areaServed": {"@type": "Country", "name": "España"}
             },
             "inLanguage": "es",
-            "dateModified": datetime.now().strftime("%Y-%m-%d")
+            "dateModified": datetime.now(timezone.utc).strftime("%Y-%m-%d")
         }
 
         # Generate FAQ section and schema
-        faq_html, faq_schema = self._generate_faq_section(nombre, comunidad)
+        faq_html, faq_schema = self._generate_faq_section(nombre, comunidad, stats)
         seo_text = self._generate_province_seo_text(nombre, comunidad)
 
         # Combine all schemas
@@ -1054,16 +1243,23 @@ class ProvinciaPageGenerator:
 </html>
 <!-- /wp:html -->'''
 
-    def _set_seo_meta(self, page_id: int, provincia_codigo: str):
-        """Sets Rank Math and Yoast SEO meta fields for a province page."""
+    def _set_seo_meta(self, page_id: int, provincia_codigo: str, stats: Optional[dict] = None):
+        """Sets Rank Math and Yoast SEO meta fields for a province page.
+
+        Accepts optional `stats` from create_page to avoid duplicate DB queries.
+        """
         prov = PROVINCIAS_ESPANA[provincia_codigo]
         nombre = prov["nombre"]
         slug = prov["slug"]
         comunidad = prov.get("comunidad", "España")
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
 
-        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
+        if stats is None:
+            stats = self._get_provincia_stats(provincia_codigo)
+        total_activas = stats.get("total_activas", 0)
+
+        meta_title = self._build_meta_title(nombre, current_year, total_activas)
         meta_desc = (
             f"Subastas judiciales en {nombre} {current_year}. "
             f"Listado actualizado de pisos, casas, locales y fincas embargadas en {nombre} ({comunidad}). "
@@ -1109,10 +1305,11 @@ class ProvinciaPageGenerator:
         if not prov:
             raise ValueError(f"Código de provincia no válido: {provincia_codigo}")
 
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         slug = f"subastas-judiciales-{prov['slug']}"
-        title = f"Subastas Judiciales en {prov['nombre']} {current_year} | Inmuebles BOE Actualizado"
-        content = self.generate_page_content(provincia_codigo)
+        stats = self._get_provincia_stats(provincia_codigo)
+        title = self._build_meta_title(prov["nombre"], current_year, stats["total_activas"])
+        content = self.generate_page_content(provincia_codigo, stats=stats)
 
         # Verificar si ya existe
         existing = self._get_existing_page(slug)
@@ -1130,7 +1327,7 @@ class ProvinciaPageGenerator:
             result = response.json()
             page_id = result.get("id")
             if page_id:
-                self._set_seo_meta(page_id, provincia_codigo)
+                self._set_seo_meta(page_id, provincia_codigo, stats=stats)
             return {
                 "action": "updated",
                 "id": page_id,
@@ -1151,7 +1348,7 @@ class ProvinciaPageGenerator:
             result = response.json()
             page_id = result.get("id")
             if page_id:
-                self._set_seo_meta(page_id, provincia_codigo)
+                self._set_seo_meta(page_id, provincia_codigo, stats=stats)
             return {
                 "action": "created",
                 "id": page_id,
@@ -1215,7 +1412,7 @@ class ProvinciaPageGenerator:
         </div>
 '''
 
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         site_url = "https://comprarensubasta.com"
         page_url = f"{site_url}/subastas-judiciales/"
         meta_title = f"Subastas Judiciales en Espa\u00f1a {current_year} - Todas las Provincias | Comprar en Subasta"
@@ -1604,7 +1801,7 @@ class ProvinciaPageGenerator:
 
     def _set_index_seo_meta(self, page_id: int):
         """Sets SEO meta fields for the index page."""
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         meta_title = f"Subastas Judiciales en España {current_year} - Todas las Provincias | Comprar en Subasta"
         meta_desc = (
             f"Subastas judiciales de inmuebles en las 52 provincias de España {current_year}. "
@@ -1639,7 +1836,7 @@ class ProvinciaPageGenerator:
         """
         Crea o actualiza la página índice de subastas.
         """
-        current_year = datetime.now().year
+        current_year = datetime.now(timezone.utc).year
         slug = "subastas-judiciales"
         title = f"Subastas Judiciales en España {current_year} | Todas las Provincias"
         content = self.generate_index_page_content()
