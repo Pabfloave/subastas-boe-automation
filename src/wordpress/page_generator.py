@@ -74,7 +74,7 @@ class ProvinciaPageGenerator:
         return f"""<section class="seo-content" itemscope itemtype="https://schema.org/Article">
     <h2>Subastas Judiciales en {nombre}: Oportunidades de Inversi\u00f3n Inmobiliaria {current_year}</h2>
     <p>Las <strong>subastas judiciales en {nombre}</strong> representan una de las mejores v\u00edas para adquirir inmuebles por debajo de su valor de mercado. A trav\u00e9s del <strong>Portal de Subastas del BOE</strong>, puede acceder a viviendas, locales comerciales, garajes y fincas r\u00fasticas embargadas en la provincia de {nombre} ({comunidad}) con descuentos que pueden alcanzar entre el 30% y el 60% sobre el precio de tasaci\u00f3n.</p>
-    <p>En CAFAVE INVESTMENT actualizamos diariamente todas las subastas publicadas en el Bolet\u00edn Oficial del Estado para {nombre}, ofreciendo informaci\u00f3n verificada sobre valores de subasta, dep\u00f3sitos necesarios, fechas de finalizaci\u00f3n y estado de cada procedimiento. Nuestro equipo de abogados especializados analiza las cargas registrales y la situaci\u00f3n posesoria de cada inmueble antes de recomendar una inversi\u00f3n.</p>
+    <p>En {settings.BRAND_NAME} actualizamos diariamente todas las subastas publicadas en el Bolet\u00edn Oficial del Estado para {nombre}, ofreciendo informaci\u00f3n verificada sobre valores de subasta, dep\u00f3sitos necesarios, fechas de finalizaci\u00f3n y estado de cada procedimiento. Nuestro equipo de abogados especializados analiza las cargas registrales y la situaci\u00f3n posesoria de cada inmueble antes de recomendar una inversi\u00f3n.</p>
 
     <h3>Tipos de inmuebles disponibles en subastas en {nombre}</h3>
     <ul>
@@ -113,7 +113,7 @@ class ProvinciaPageGenerator:
             },
             {
                 "q": f"\u00bfCon qu\u00e9 frecuencia se publican nuevas subastas en {nombre}?",
-                "a": f"Las subastas judiciales en {nombre} se publican continuamente en el BOE. En CAFAVE INVESTMENT actualizamos nuestro listado cada 24 horas para que tenga acceso a las \u00faltimas oportunidades inmobiliarias publicadas en {comunidad}."
+                "a": f"Las subastas judiciales en {nombre} se publican continuamente en el BOE. En {settings.BRAND_NAME} actualizamos nuestro listado cada 24 horas para que tenga acceso a las \u00faltimas oportunidades inmobiliarias publicadas en {comunidad}."
             },
             {
                 "q": f"\u00bfPuedo visitar el inmueble antes de pujar en una subasta en {nombre}?",
@@ -169,8 +169,8 @@ class ProvinciaPageGenerator:
         slug = prov["slug"]
         comunidad = prov.get("comunidad", "España")
         current_year = datetime.now().year
-        page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
-        site_url = "https://comprarensubasta.com"
+        site_url = settings.WP_URL
+        page_url = f"{site_url}/subastas-judiciales-{slug}/"
 
         meta_description = (
             f"Subastas judiciales en {nombre} {current_year}. "
@@ -180,7 +180,7 @@ class ProvinciaPageGenerator:
         if len(meta_description) > 160:
             meta_description = meta_description[:157] + "..."
 
-        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
+        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - {settings.SITE_NAME}"
 
         # JSON-LD structured data
         breadcrumb_schema = {
@@ -199,7 +199,7 @@ class ProvinciaPageGenerator:
             "name": meta_title,
             "description": meta_description,
             "url": page_url,
-            "isPartOf": {"@type": "WebSite", "name": "Comprar en Subasta", "url": site_url},
+            "isPartOf": {"@type": "WebSite", "name": settings.SITE_NAME, "url": site_url},
             "about": {
                 "@type": "Service",
                 "name": f"Subastas Judiciales en {nombre}",
@@ -212,7 +212,7 @@ class ProvinciaPageGenerator:
             },
             "provider": {
                 "@type": "LegalService",
-                "name": "CAFAVE INVESTMENT",
+                "name": settings.BRAND_NAME,
                 "url": site_url,
                 "areaServed": {"@type": "Country", "name": "España"}
             },
@@ -246,7 +246,7 @@ class ProvinciaPageGenerator:
   <meta property="og:url" content="{page_url}">
   <meta property="og:title" content="{meta_title}">
   <meta property="og:description" content="{meta_description}">
-  <meta property="og:site_name" content="Comprar en Subasta - CAFAVE INVESTMENT">
+  <meta property="og:site_name" content="{settings.SITE_NAME} - {settings.BRAND_NAME}">
   <meta property="og:locale" content="es_ES">
 
   <!-- Twitter Card -->
@@ -849,7 +849,7 @@ class ProvinciaPageGenerator:
   <!-- ===== INTRO SECTION ===== -->
   <section class="intro-section">
     <h1>Subastas Judiciales en {nombre} {current_year}</h1>
-    <p>Listado completo y actualizado de <strong>subastas judiciales de inmuebles en {nombre}</strong> ({comunidad}) publicadas en el BOE. Pisos, casas, locales y fincas embargadas con descuentos de hasta el 60%. Asesoramiento legal de CAFAVE INVESTMENT.</p>
+    <p>Listado completo y actualizado de <strong>subastas judiciales de inmuebles en {nombre}</strong> ({comunidad}) publicadas en el BOE. Pisos, casas, locales y fincas embargadas con descuentos de hasta el 60%. Asesoramiento legal de {settings.BRAND_NAME}.</p>
 
     <div class="stats-grid">
       <div class="stat-box">
@@ -937,7 +937,7 @@ class ProvinciaPageGenerator:
       badgeText = 'En Curso';
     }}
 
-    const lotesBadge = numLotes > 1 ? `<span class="badge badge-lotes">📦 ${{numLotes}} Lotes</span>` : '';
+    const lotesBadge = numLotes > 1 ? `<span class="badge badge-lotes"><span aria-hidden="true">📦</span> ${{numLotes}} Lotes</span>` : '';
 
     return `
       <article class="subasta-card ${{numLotes > 1 ? 'multi-lotes' : ''}}">
@@ -953,23 +953,23 @@ class ProvinciaPageGenerator:
         </header>
         <div class="subasta-info-grid">
           <div class="info-item">
-            <div class="info-label">💰 Valor Subasta${{numLotes > 1 ? ' (Total)' : ''}}</div>
+            <div class="info-label"><span aria-hidden="true">💰</span> Valor Subasta${{numLotes > 1 ? ' (Total)' : ''}}</div>
             <div class="info-value precio-destacado">${{valor}}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">🏷️ Depósito${{numLotes > 1 ? ' (Total)' : ''}}</div>
+            <div class="info-label"><span aria-hidden="true">🏷️</span> Depósito${{numLotes > 1 ? ' (Total)' : ''}}</div>
             <div class="info-value">${{deposito}}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">📅 Finaliza</div>
+            <div class="info-label"><span aria-hidden="true">📅</span> Finaliza</div>
             <div class="info-value">${{fechaFin}}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">🏠 Tipo</div>
+            <div class="info-label"><span aria-hidden="true">🏠</span> Tipo</div>
             <div class="info-value">${{tipo}}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">📍 Localidad</div>
+            <div class="info-label"><span aria-hidden="true">📍</span> Localidad</div>
             <div class="info-value">${{localidad}}</div>
           </div>
         </div>
@@ -1061,9 +1061,9 @@ class ProvinciaPageGenerator:
         slug = prov["slug"]
         comunidad = prov.get("comunidad", "España")
         current_year = datetime.now().year
-        page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
+        page_url = f"{settings.WP_URL}/subastas-judiciales-{slug}/"
 
-        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
+        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - {settings.SITE_NAME}"
         meta_desc = (
             f"Subastas judiciales en {nombre} {current_year}. "
             f"Listado actualizado de pisos, casas, locales y fincas embargadas en {nombre} ({comunidad}). "
@@ -1216,9 +1216,9 @@ class ProvinciaPageGenerator:
 '''
 
         current_year = datetime.now().year
-        site_url = "https://comprarensubasta.com"
+        site_url = settings.WP_URL
         page_url = f"{site_url}/subastas-judiciales/"
-        meta_title = f"Subastas Judiciales en Espa\u00f1a {current_year} - Todas las Provincias | Comprar en Subasta"
+        meta_title = f"Subastas Judiciales en Espa\u00f1a {current_year} - Todas las Provincias | {settings.SITE_NAME}"
         meta_description = (
             f"Subastas judiciales de inmuebles en las 52 provincias de Espa\u00f1a {current_year}. "
             "Pisos, casas, locales y fincas embargadas del BOE. Listado actualizado diariamente."
@@ -1239,10 +1239,10 @@ class ProvinciaPageGenerator:
             "name": meta_title,
             "description": meta_description,
             "url": page_url,
-            "isPartOf": {"@type": "WebSite", "name": "Comprar en Subasta", "url": site_url},
+            "isPartOf": {"@type": "WebSite", "name": settings.SITE_NAME, "url": site_url},
             "provider": {
                 "@type": "LegalService",
-                "name": "CAFAVE INVESTMENT",
+                "name": settings.BRAND_NAME,
                 "url": site_url
             },
             "inLanguage": "es"
@@ -1263,7 +1263,7 @@ class ProvinciaPageGenerator:
   <meta property="og:url" content="{page_url}">
   <meta property="og:title" content="{meta_title}">
   <meta property="og:description" content="{meta_description}">
-  <meta property="og:site_name" content="Comprar en Subasta - CAFAVE INVESTMENT">
+  <meta property="og:site_name" content="{settings.SITE_NAME} - {settings.BRAND_NAME}">
   <meta property="og:locale" content="es_ES">
 
   <!-- Twitter Card -->
@@ -1605,12 +1605,12 @@ class ProvinciaPageGenerator:
     def _set_index_seo_meta(self, page_id: int):
         """Sets SEO meta fields for the index page."""
         current_year = datetime.now().year
-        meta_title = f"Subastas Judiciales en España {current_year} - Todas las Provincias | Comprar en Subasta"
+        meta_title = f"Subastas Judiciales en España {current_year} - Todas las Provincias | {settings.SITE_NAME}"
         meta_desc = (
             f"Subastas judiciales de inmuebles en las 52 provincias de España {current_year}. "
             "Pisos, casas, locales y fincas embargadas del BOE. Listado actualizado diariamente."
         )
-        page_url = "https://comprarensubasta.com/subastas-judiciales/"
+        page_url = f"{settings.WP_URL}/subastas-judiciales/"
         focus_kw = "subastas judiciales españa"
 
         meta_fields = {

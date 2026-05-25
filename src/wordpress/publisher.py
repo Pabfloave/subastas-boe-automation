@@ -47,12 +47,17 @@ class WordPressPublisher:
         # Verificar si ya existe (slug determinista + búsqueda por contenido)
         existing_post = self._find_existing_post(subasta.id_subasta)
 
+        # Canonical URL: usamos el permalink real del post para evitar que
+        # Rank Math reciba un valor vacío (que puede provocar canonicals
+        # incorrectos y canibalización entre posts duplicados).
+        canonical_url = existing_post.get("link", "") if existing_post else ""
+
         # Generar contenido
         title = self._generate_title(subasta)
         content = self._generate_content(subasta)
         categories = self._get_categories(subasta)
         tags = self._get_tags(subasta)
-        meta = self._generate_meta(subasta)
+        meta = self._generate_meta(subasta, canonical_url=canonical_url)
 
         post_data = {
             "title": title,
@@ -77,6 +82,13 @@ class WordPressPublisher:
             post_data["slug"] = self.client.make_subasta_slug(subasta.id_subasta)
             result = self.client.create_post(**post_data)
             post_id = result["id"]
+            # Tras crear, fijar el canonical con el link real que devuelve WP
+            actual_link = result.get("link", "")
+            if actual_link:
+                self.client.update_post(
+                    post_id,
+                    {"meta": {"rank_math_canonical_url": actual_link}},
+                )
             logger.info(f"Post creado: {post_id} - {subasta.id_subasta}")
             return post_id
 
@@ -145,7 +157,7 @@ class WordPressPublisher:
         """
         Genera la meta description SEO-optimizada.
 
-        Formato: "🏠 Subasta judicial de [tipo] en [localidad], [provincia].
+        Formato: "Subasta judicial de [tipo] en [localidad], [provincia].
                   Valor: [precio]€. Finaliza [fecha]. Asesoramiento legal gratuito."
 
         Máximo 155-160 caracteres para evitar truncamiento en Google.
@@ -212,7 +224,7 @@ class WordPressPublisher:
         if subasta.fecha_conclusion:
             fecha_disponible = subasta.fecha_conclusion.strftime("%Y-%m-%d")
 
-        site_url = "https://comprarensubasta.com"
+        site_url = settings.WP_URL
 
         # Schema 1: BreadcrumbList
         breadcrumb_items = [
@@ -280,7 +292,7 @@ class WordPressPublisher:
         org_schema = {
             "@context": "https://schema.org",
             "@type": "LegalService",
-            "name": "CAFAVE INVESTMENT - Comprar en Subasta",
+            "name": f"{settings.BRAND_NAME} - {settings.SITE_NAME}",
             "description": "Asesoramiento legal especializado en subastas judiciales e inmobiliarias en España",
             "url": site_url,
             "areaServed": {
@@ -639,7 +651,7 @@ class WordPressPublisher:
 
     <!-- Alerta de Estado -->
     <div class="subasta-alerta {estado_class}">
-        <strong>🔔 {estado_texto.upper()}</strong>
+        <strong><span aria-hidden="true">🔔</span> {estado_texto.upper()}</strong>
         {f' - Finaliza: {format_date(subasta.fecha_conclusion)}' if subasta.fecha_conclusion else ''}
     </div>
 
@@ -699,7 +711,7 @@ class WordPressPublisher:
                 html += f"""
     <!-- Aviso de múltiples lotes -->
     <div class="subasta-alerta multi-lotes">
-        <strong>📦 Esta subasta incluye {num_bienes} LOTES</strong>
+        <strong><span aria-hidden="true">📦</span> Esta subasta incluye {num_bienes} LOTES</strong>
         <p>A continuación se detallan todos los bienes incluidos en esta subasta.</p>
     </div>
 """
@@ -714,7 +726,7 @@ class WordPressPublisher:
                     valores_lote_html = f"""
         <!-- Valores económicos del lote -->
         <div class="valores-lote">
-            <h3>💰 Valores Económicos del Lote {idx}</h3>
+            <h3><span aria-hidden="true">💰</span> Valores Económicos del Lote {idx}</h3>
             <table class="tabla-valores-lote">
                 <tr>
                     <th>Valor Subasta</th>
@@ -854,7 +866,7 @@ class WordPressPublisher:
                     html += f"""
         <!-- Mapa de ubicación -->
         <div class="mapa-ubicacion">
-            <h3>📍 Ubicación del Inmueble</h3>
+            <h3><span aria-hidden="true">📍</span> Ubicación del Inmueble</h3>
             <div class="mapa-container">
                 <iframe
                     src="https://www.google.com/maps?q={direccion_encoded}&output=embed"
@@ -871,7 +883,7 @@ class WordPressPublisher:
                target="_blank"
                rel="nofollow"
                class="btn-mapa">
-                🗺️ Ver en Google Maps
+                <span aria-hidden="true">🗺️</span> Ver en Google Maps
             </a>
         </div>
 """
@@ -887,7 +899,7 @@ class WordPressPublisher:
                 if bien.cargas:
                     html += f"""
         <div class="cargas-bien">
-            <h3>⚠️ Cargas</h3>
+            <h3><span aria-hidden="true">⚠️</span> Cargas</h3>
             <p>{bien.cargas}</p>
         </div>
 """
@@ -901,9 +913,9 @@ class WordPressPublisher:
         <ul class="lista-documentos">
 """
         if subasta.url_edicto:
-            html += f'            <li><a href="{subasta.url_edicto}" target="_blank" rel="nofollow">📜 Edicto de la Subasta (PDF)</a></li>\n'
+            html += f'            <li><a href="{subasta.url_edicto}" target="_blank" rel="nofollow"><span aria-hidden="true">📜</span> Edicto de la Subasta (PDF)</a></li>\n'
         if subasta.url_certificacion_cargas:
-            html += f'            <li><a href="{subasta.url_certificacion_cargas}" target="_blank" rel="nofollow">📋 Certificación de Cargas (PDF)</a></li>\n'
+            html += f'            <li><a href="{subasta.url_certificacion_cargas}" target="_blank" rel="nofollow"><span aria-hidden="true">📋</span> Certificación de Cargas (PDF)</a></li>\n'
 
         html += f"""        </ul>
     </div>
@@ -948,7 +960,7 @@ class WordPressPublisher:
         <p>
             <a href="{subasta.url_detalle or f'https://subastas.boe.es/detalleSubasta.php?idSub={subasta.id_subasta}'}"
                target="_blank" rel="nofollow">
-                🔗 Ver subasta original en Portal BOE
+                <span aria-hidden="true">🔗</span> Ver subasta original en Portal BOE
             </a>
         </p>
         <p class="aviso-legal">
@@ -1023,9 +1035,16 @@ class WordPressPublisher:
 
         return tags
 
-    def _generate_meta(self, subasta: Subasta) -> dict:
+    def _generate_meta(self, subasta: Subasta, canonical_url: str = "") -> dict:
         """
         Genera los campos meta para el post, incluyendo SEO.
+
+        Args:
+            subasta: subasta a serializar
+            canonical_url: permalink real del post (vacío para posts nuevos
+                cuando aún no conocemos el link; en ese caso omitimos el
+                campo para que Rank Math use su default en lugar de aplicar
+                un canonical vacío)
 
         Incluye campos para:
         - Datos internos de la subasta
@@ -1047,14 +1066,14 @@ class WordPressPublisher:
         focus_keyword = f"subasta {tipo.lower()} {localidad.lower()}"
 
         # SEO title (<60 chars) - priorizar información útil
-        seo_title = f"Subasta {tipo} en {localidad} | Comprar en Subasta"
+        seo_title = f"Subasta {tipo} en {localidad} | {settings.SITE_NAME}"
         if len(seo_title) > 60:
             seo_title = f"Subasta {tipo} en {localidad}"
         if len(seo_title) > 60:
             seo_title = seo_title[:57] + "..."
 
         # OG/Twitter title (puede ser algo más largo, ~95 chars max)
-        og_title = f"Subasta {tipo} en {localidad} | Comprar en Subasta"
+        og_title = f"Subasta {tipo} en {localidad} | {settings.SITE_NAME}"
 
         # Número de lotes
         num_lotes = len(subasta.bienes)
@@ -1091,10 +1110,15 @@ class WordPressPublisher:
             "rank_math_description": meta_description,
             "rank_math_focus_keyword": focus_keyword,
             "rank_math_title": seo_title,
-            "rank_math_canonical_url": "",
             # Disable Rank Math auto-schema (we generate our own JSON-LD)
             "rank_math_rich_snippet": "off",
         }
+
+        # Solo seteamos canonical si conocemos el permalink real.
+        # Un canonical vacío hace que Rank Math no lo regenere por su cuenta;
+        # mejor omitir el campo y que use su default basado en el post.
+        if canonical_url:
+            meta["rank_math_canonical_url"] = canonical_url
 
         if bien:
             meta.update({
