@@ -3,9 +3,35 @@ Funciones auxiliares para el proyecto.
 """
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
+
+
+def utcnow() -> datetime:
+    """
+    Devuelve el instante actual con timezone UTC explícito.
+
+    Reemplaza el patrón naive `datetime.now()` en escrituras a BD para
+    que los timestamps queden inequívocamente referenciados a UTC. Ver
+    la nota de compatibilidad en src/models/database.py.
+    """
+    return datetime.now(timezone.utc)
+
+
+def ensure_aware(dt: Optional[datetime]) -> Optional[datetime]:
+    """
+    Devuelve un datetime tz-aware. Si `dt` es naive, asume UTC.
+
+    Útil para comparar timestamps recién escritos (tz-aware) con
+    registros heredados que se guardaron como naive antes de la
+    migración de timezones.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def format_currency(value: Decimal, symbol: str = "€") -> str:

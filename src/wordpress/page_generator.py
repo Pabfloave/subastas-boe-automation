@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, Optional
 from config import settings
 from config.provinces import PROVINCIAS_ESPANA
+from ..utils.helpers import utcnow
 
 # Cache de IDs de categorías (se llena dinámicamente)
 _CATEGORIA_CACHE = {}
@@ -70,7 +71,7 @@ class ProvinciaPageGenerator:
 
     def _generate_province_seo_text(self, nombre: str, comunidad: str) -> str:
         """Genera texto SEO estático único para cada provincia."""
-        current_year = datetime.now().year
+        current_year = utcnow().year
         return f"""<section class="seo-content" itemscope itemtype="https://schema.org/Article">
     <h2>Subastas Judiciales en {nombre}: Oportunidades de Inversi\u00f3n Inmobiliaria {current_year}</h2>
     <p>Las <strong>subastas judiciales en {nombre}</strong> representan una de las mejores v\u00edas para adquirir inmuebles por debajo de su valor de mercado. A trav\u00e9s del <strong>Portal de Subastas del BOE</strong>, puede acceder a viviendas, locales comerciales, garajes y fincas r\u00fasticas embargadas en la provincia de {nombre} ({comunidad}) con descuentos que pueden alcanzar entre el 30% y el 60% sobre el precio de tasaci\u00f3n.</p>
@@ -97,7 +98,7 @@ class ProvinciaPageGenerator:
 
     def _generate_faq_section(self, nombre: str, comunidad: str) -> str:
         """Genera sección FAQ con Schema markup para rich snippets."""
-        current_year = datetime.now().year
+        current_year = utcnow().year
         faqs = [
             {
                 "q": f"\u00bfC\u00f3mo puedo comprar un piso en subasta judicial en {nombre}?",
@@ -168,7 +169,7 @@ class ProvinciaPageGenerator:
         nombre = prov["nombre"]
         slug = prov["slug"]
         comunidad = prov.get("comunidad", "España")
-        current_year = datetime.now().year
+        current_year = utcnow().year
         page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
         site_url = "https://comprarensubasta.com"
 
@@ -217,7 +218,7 @@ class ProvinciaPageGenerator:
                 "areaServed": {"@type": "Country", "name": "España"}
             },
             "inLanguage": "es",
-            "dateModified": datetime.now().strftime("%Y-%m-%d")
+            "dateModified": utcnow().strftime("%Y-%m-%d")
         }
 
         # Generate FAQ section and schema
@@ -1060,7 +1061,7 @@ class ProvinciaPageGenerator:
         nombre = prov["nombre"]
         slug = prov["slug"]
         comunidad = prov.get("comunidad", "España")
-        current_year = datetime.now().year
+        current_year = utcnow().year
         page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
 
         meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
@@ -1109,7 +1110,7 @@ class ProvinciaPageGenerator:
         if not prov:
             raise ValueError(f"Código de provincia no válido: {provincia_codigo}")
 
-        current_year = datetime.now().year
+        current_year = utcnow().year
         slug = f"subastas-judiciales-{prov['slug']}"
         title = f"Subastas Judiciales en {prov['nombre']} {current_year} | Inmuebles BOE Actualizado"
         content = self.generate_page_content(provincia_codigo)
@@ -1215,7 +1216,7 @@ class ProvinciaPageGenerator:
         </div>
 '''
 
-        current_year = datetime.now().year
+        current_year = utcnow().year
         site_url = "https://comprarensubasta.com"
         page_url = f"{site_url}/subastas-judiciales/"
         meta_title = f"Subastas Judiciales en Espa\u00f1a {current_year} - Todas las Provincias | Comprar en Subasta"
@@ -1604,7 +1605,7 @@ class ProvinciaPageGenerator:
 
     def _set_index_seo_meta(self, page_id: int):
         """Sets SEO meta fields for the index page."""
-        current_year = datetime.now().year
+        current_year = utcnow().year
         meta_title = f"Subastas Judiciales en España {current_year} - Todas las Provincias | Comprar en Subasta"
         meta_desc = (
             f"Subastas judiciales de inmuebles en las 52 provincias de España {current_year}. "
@@ -1639,7 +1640,7 @@ class ProvinciaPageGenerator:
         """
         Crea o actualiza la página índice de subastas.
         """
-        current_year = datetime.now().year
+        current_year = utcnow().year
         slug = "subastas-judiciales"
         title = f"Subastas Judiciales en España {current_year} | Todas las Provincias"
         content = self.generate_index_page_content()

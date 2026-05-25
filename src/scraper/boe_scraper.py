@@ -3,6 +3,7 @@ Scraper principal para el portal de subastas del BOE.
 Utiliza Selenium para navegar y extraer datos de subastas.boe.es
 """
 import time
+import tempfile
 import logging
 from typing import List, Optional, Dict, Generator
 from datetime import datetime
@@ -27,6 +28,11 @@ from config import settings
 
 
 logger = logging.getLogger(__name__)
+
+# Tope duro de tiempo por provincia en buscar_subastas(). Si la paginación del BOE
+# rompe (_ir_siguiente_pagina devuelve True falsamente), el bucle iteraría
+# max_paginas × delay segundos sin avanzar. Esto lo corta a tiempo.
+MAX_SEARCH_DURATION_SECONDS = 120
 
 
 class BOEScraper:
@@ -172,8 +178,18 @@ class BOEScraper:
             self._wait_for_page_load()
             time.sleep(self.delay)
 
+            start_time = time.time()
             pagina = 1
             while pagina <= max_paginas:
+                elapsed = time.time() - start_time
+                if elapsed > MAX_SEARCH_DURATION_SECONDS:
+                    logger.warning(
+                        f"Timeout absoluto alcanzado ({elapsed:.1f}s > "
+                        f"{MAX_SEARCH_DURATION_SECONDS}s) en provincia {provincia} "
+                        f"tras {pagina - 1} páginas — abortando paginación"
+                    )
+                    break
+
                 logger.info(f"Procesando página {pagina} de resultados")
 
                 # Obtener HTML de la página actual
@@ -186,10 +202,17 @@ class BOEScraper:
                 # Verificar si hay error en la página
                 if "ERROR" in html or "error" in html.lower():
                     logger.warning("Posible error en la página de resultados")
-                    # Guardar para debug
-                    with open("/tmp/boe_debug.html", "w", encoding="utf-8") as f:
+                    # Guardar para debug — archivo único por thread/provincia para evitar
+                    # sobrescritura cuando varios scrapers corren en paralelo (GH Actions matrix)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    prefix = f"boe_debug_{provincia}_{timestamp}_"
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", encoding="utf-8", suffix=".html",
+                        prefix=prefix, delete=False
+                    ) as f:
                         f.write(html)
-                    logger.info("HTML guardado en /tmp/boe_debug.html para depuración")
+                        debug_path = f.name
+                    logger.info(f"HTML guardado en {debug_path} para depuración")
 
                 # Parsear listado
                 subastas_en_pagina = self._extraer_subastas_de_listado(html)
