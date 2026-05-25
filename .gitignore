@@ -27,6 +27,9 @@ scripts/cleanup_finalizadas.sql
 logs/
 *.log
 
+# Newsletter previews (output local de --dry-run)
+data/newsletters/
+
 # IDE
 .idea/
 .vscode/

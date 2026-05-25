@@ -23,6 +23,17 @@ python-dateutil>=2.8.0
 
 # Nota: SQLite viene incluido con Python
 
+# Lead Magnets — PDF generation y templates
+# WeasyPrint requiere libs del sistema: Pango, Cairo, GDK-PixBuf
+#   macOS:  brew install pango libffi gdk-pixbuf
+#   Debian: apt install libpango-1.0-0 libpangoft2-1.0-0
+weasyprint>=62.0
+Jinja2>=3.1.0
+
+# Lead Magnets — Envío email (newsletter semanal)
+# smtplib viene incluido con Python; sólo añadimos el cliente HTML
+premailer>=3.10.0   # inline CSS for email clients
+
 # Opcionales para desarrollo
 # pytest>=7.4.0
 # pytest-cov>=4.1.0
