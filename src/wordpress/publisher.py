@@ -925,6 +925,15 @@ class WordPressPublisher:
         html += self._generate_faq_html(subasta)
 
         # CTA - Llamada a la acción
+        # Construimos el query string una vez para reutilizarlo en ambos CTAs y el footer.
+        cta_qs = (
+            f"subasta={urllib.parse.quote(subasta.id_subasta)}"
+            f"&tipo={urllib.parse.quote(tipo_bien)}"
+            f"&localidad={urllib.parse.quote(localidad)}"
+            f"&provincia={urllib.parse.quote(provincia)}"
+        )
+        informe_url = f"/informe-juridico-subasta/?{cta_qs}"
+
         html += f"""
     <!-- CTA - Optimizado para conversión -->
     <div class="subasta-cta">
@@ -938,9 +947,23 @@ class WordPressPublisher:
             <li>Gestión post-adjudicación y escrituración</li>
         </ul>
         <p><strong>Primera consulta gratuita</strong> - Te explicamos si esta subasta es una buena oportunidad.</p>
-        <a href="{self.contact_url}?subasta={urllib.parse.quote(subasta.id_subasta)}&tipo={urllib.parse.quote(tipo_bien)}&localidad={urllib.parse.quote(localidad)}&provincia={urllib.parse.quote(provincia)}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
+        <a href="{self.contact_url}?{cta_qs}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
             Solicitar Análisis Gratuito
         </a>
+
+        <!-- CTA secundario: producto de pago con entrega 24h -->
+        <div class="subasta-cta-secundario" style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.25);">
+            <p style="margin:0 0 12px;font-size:0.97em;">
+                ¿Necesitas un análisis legal completo en 24h?
+                Pide nuestro <strong>Informe Jurídico de Viabilidad</strong> de esta subasta por <strong>72,60&nbsp;€</strong>:
+                cargas registrales, hoja de ruta procesal, riesgos y proyección de costes.
+            </p>
+            <a href="{informe_url}" class="btn-cta-secundario"
+               title="Solicitar Informe Jurídico de Viabilidad de esta subasta en {localidad}"
+               style="display:inline-block;background:#ffffff;color:#1e40af;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;border:2px solid #ffffff;">
+                📄 Solicitar Informe Jurídico · 72,60&nbsp;€
+            </a>
+        </div>
     </div>
 
     <!-- Enlace BOE -->
@@ -956,6 +979,13 @@ class WordPressPublisher:
                 La información mostrada proviene del Portal de Subastas del BOE.
                 Recomendamos verificar los datos directamente en la fuente oficial antes de participar.
             </small>
+        </p>
+        <!-- Footer link a la landing del informe jurídico -->
+        <p class="ficha-footer-informe" style="margin-top:14px;text-align:center;font-size:0.9em;color:#475569;">
+            ¿Dudas sobre esta subasta?
+            <a href="{informe_url}" title="Informe Jurídico de Viabilidad de esta subasta" style="color:#1e40af;font-weight:600;">
+                Pide el Informe Jurídico de Viabilidad (72,60&nbsp;€, entrega 24h)
+            </a>.
         </p>
     </div>
 
