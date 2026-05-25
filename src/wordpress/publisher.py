@@ -9,6 +9,7 @@ from datetime import datetime
 
 from .client import WordPressClient
 from ..models.subasta import Subasta, Bien
+from ..services.geocoder import Geocoder
 
 import sys
 from pathlib import Path
@@ -23,15 +24,17 @@ logger = logging.getLogger(__name__)
 class WordPressPublisher:
     """Publica subastas en WordPress."""
 
-    def __init__(self, client: WordPressClient = None):
+    def __init__(self, client: WordPressClient = None, geocoder: Geocoder = None):
         """
         Inicializa el publicador.
 
         Args:
             client: Cliente WordPress (opcional, se crea uno por defecto)
+            geocoder: Geocoder con cache (opcional; se crea uno por defecto)
         """
         self.client = client or WordPressClient()
         self.contact_url = settings.WP_CONTACT_FORM_URL
+        self.geocoder = geocoder or Geocoder()
 
     def publish_subasta(self, subasta: Subasta, update_if_exists: bool = True) -> int:
         """
@@ -849,7 +852,18 @@ class WordPressPublisher:
                     if bien.provincia:
                         direccion_original += f", {bien.provincia}"
 
-                    direccion_encoded = urllib.parse.quote(direccion_completa)
+                    iframe_src, link_href, precision_label = self._build_mapa_urls(
+                        direccion_limpia=direccion_maps,
+                        localidad=bien.localidad,
+                        provincia=bien.provincia,
+                        codigo_postal=bien.codigo_postal,
+                        direccion_completa=direccion_completa,
+                    )
+
+                    precision_html = (
+                        f'<p class="mapa-precision"><small>{precision_label}</small></p>'
+                        if precision_label else ""
+                    )
 
                     html += f"""
         <!-- Mapa de ubicación -->
@@ -857,7 +871,7 @@ class WordPressPublisher:
             <h3>📍 Ubicación del Inmueble</h3>
             <div class="mapa-container">
                 <iframe
-                    src="https://www.google.com/maps?q={direccion_encoded}&output=embed"
+                    src="{iframe_src}"
                     width="100%"
                     height="350"
                     style="border:0; border-radius: 8px;"
@@ -867,7 +881,8 @@ class WordPressPublisher:
                 </iframe>
             </div>
             <p class="mapa-direccion"><strong>Dirección:</strong> {direccion_original}</p>
-            <a href="https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+            {precision_html}
+            <a href="{link_href}"
                target="_blank"
                rel="nofollow"
                class="btn-mapa">
@@ -962,6 +977,66 @@ class WordPressPublisher:
 </div>
 """
         return html
+
+    def _build_mapa_urls(
+        self,
+        direccion_limpia: str,
+        localidad: Optional[str],
+        provincia: Optional[str],
+        codigo_postal: Optional[str],
+        direccion_completa: str,
+    ) -> tuple:
+        """
+        Devuelve (iframe_src, link_href, precision_label) según el resultado de geocodificación.
+
+        - Si hay GOOGLE_MAPS_API_KEY y el geocoding tiene éxito → Maps Embed con coordenadas exactas.
+        - Si hay key pero geocoding falla → Maps Embed con la provincia (mapa aproximado).
+        - Si no hay key → iframe legacy basado en texto (comportamiento histórico).
+        """
+        api_key = settings.GOOGLE_MAPS_API_KEY
+        direccion_encoded = urllib.parse.quote(direccion_completa)
+
+        if not api_key:
+            iframe_src = f"https://www.google.com/maps?q={direccion_encoded}&output=embed"
+            link_href = f"https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+            return iframe_src, link_href, ""
+
+        result = self.geocoder.geocode(
+            direccion=direccion_limpia,
+            localidad=localidad,
+            provincia=provincia,
+            codigo_postal=codigo_postal,
+        )
+
+        # Si la Geocoding API devolvió error de cuota/permiso, lo más probable
+        # es que Maps Embed con esa misma key también falle: caemos al iframe legacy.
+        if result.status == "error_no_cache":
+            iframe_src = f"https://www.google.com/maps?q={direccion_encoded}&output=embed"
+            link_href = f"https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+            return iframe_src, link_href, ""
+
+        key_encoded = urllib.parse.quote(api_key)
+
+        if result.ok:
+            latlng = f"{result.lat:.6f},{result.lng:.6f}"
+            iframe_src = (
+                f"https://www.google.com/maps/embed/v1/place"
+                f"?key={key_encoded}&q={urllib.parse.quote(latlng)}&zoom=15"
+            )
+            link_href = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(latlng)}"
+            return iframe_src, link_href, "Ubicación geocodificada con precisión"
+
+        # Fallback: mapa de provincia
+        provincia_query = (provincia or "España").split("/")[0].strip()
+        if provincia_query and provincia_query.lower() != "españa":
+            provincia_query = f"{provincia_query}, España"
+        provincia_encoded = urllib.parse.quote(provincia_query)
+        iframe_src = (
+            f"https://www.google.com/maps/embed/v1/place"
+            f"?key={key_encoded}&q={provincia_encoded}&zoom=9"
+        )
+        link_href = f"https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
+        return iframe_src, link_href, "Ubicación aproximada (provincia) — dirección no geocodificable"
 
     def _get_categories(self, subasta: Subasta) -> List[int]:
         """Obtiene o crea las categorías para la subasta."""
