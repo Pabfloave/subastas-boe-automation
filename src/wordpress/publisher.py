@@ -942,7 +942,27 @@ class WordPressPublisher:
             Solicitar Análisis Gratuito
         </a>
     </div>
+"""
 
+        # Interlinking al pillar SEO: sólo en tipos donde las cargas son relevantes
+        # (viviendas, locales, inmuebles genéricos). Excluimos garaje/trastero/finca
+        # rústica/solar donde la sección comunidad/IBI residencial no aplica.
+        pillar_url = settings.PILLAR_CARGAS_URL
+        if pillar_url:
+            tipo_lower = (tipo_bien or "").lower()
+            tipos_relevantes = ("vivienda", "casa", "piso", "adosado", "pareado",
+                                "unifamiliar", "inmueble", "local")
+            if any(t in tipo_lower for t in tipos_relevantes):
+                html += f"""
+    <!-- Interlinking al pillar de cargas -->
+    <div class="subasta-recurso">
+        <p>📖 <strong>Antes de pujar, lee la guía completa:</strong>
+        <a href="{pillar_url}">Cargas ocultas en subastas judiciales: las 12 que pueden aniquilar tu ROI</a>.
+        Te explicamos las cargas que sobreviven a la adjudicación y cómo detectarlas.</p>
+    </div>
+"""
+
+        html += f"""
     <!-- Enlace BOE -->
     <div class="subasta-enlace-boe">
         <p>

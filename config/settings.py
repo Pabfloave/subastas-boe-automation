@@ -26,6 +26,11 @@ WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
 WP_POST_STATUS = os.getenv("WP_POST_STATUS", "publish")
 WP_CONTACT_FORM_URL = os.getenv("WP_CONTACT_FORM_URL", "https://comprarensubasta.com/#analisis")
 
+# Pillar SEO post: guía "cargas ocultas en subastas judiciales".
+# Si está definida, las fichas de vivienda/inmueble/local enlazan al pillar.
+# Dejar vacía hasta que el pillar esté publicado para evitar enlaces a 404.
+PILLAR_CARGAS_URL = os.getenv("PILLAR_CARGAS_URL", "")
+
 # Base de datos
 DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "subastas.db"))
 
