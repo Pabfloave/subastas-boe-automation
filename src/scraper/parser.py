@@ -1,5 +1,11 @@
 """
 Parser para extraer datos estructurados del HTML del BOE.
+
+Nota sobre encoding: el HTML llega como str ya decodificado por Selenium
+(page_source devuelve Unicode), así que NO pasamos `from_encoding` a
+BeautifulSoup — lo ignoraría con un UserWarning. Si en algún momento
+migramos a `requests` directos, habrá que detectar charset del header
+Content-Type y pasar `from_encoding` con los bytes.
 """
 import re
 import unicodedata

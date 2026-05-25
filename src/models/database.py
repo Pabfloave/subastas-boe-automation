@@ -1,5 +1,15 @@
 """
 Gestión de base de datos SQLite para almacenamiento de subastas.
+
+Política de timestamps (mayo 2026):
+Los timestamps de auditoría que generamos nosotros (`fecha_scraping`,
+`fecha_actualizacion`) se guardan como ISO-8601 con sufijo UTC vía
+`utcnow()`. Los registros anteriores a esta migración quedan como
+naive y siguen siendo legibles por `datetime.fromisoformat()`. No se
+hace migración masiva de la BD porque esos campos solo se usan para
+ordenar y mostrar — no se comparan contra `datetime.now()` en el
+código. Si una nueva comparación los implica, usar
+`ensure_aware()` en ambos lados.
 """
 import sqlite3
 from datetime import datetime
@@ -9,6 +19,7 @@ from pathlib import Path
 import json
 
 from .subasta import Subasta, Bien
+from ..utils.helpers import utcnow
 
 
 class Database:
@@ -233,7 +244,7 @@ class Database:
         cursor = self.conn.cursor()
 
         subasta.hash_datos = subasta.calcular_hash()
-        subasta.fecha_scraping = datetime.now()
+        subasta.fecha_scraping = utcnow()
 
         cursor.execute("""
             INSERT INTO subastas (
@@ -321,7 +332,7 @@ class Database:
         cursor = self.conn.cursor()
 
         subasta.hash_datos = subasta.calcular_hash()
-        subasta.fecha_actualizacion = datetime.now()
+        subasta.fecha_actualizacion = utcnow()
 
         cursor.execute("""
             UPDATE subastas SET
@@ -395,7 +406,7 @@ class Database:
                 wp_post_id = ?,
                 fecha_actualizacion = ?
             WHERE id_subasta = ?
-        """, (wp_post_id, datetime.now().isoformat(), id_subasta))
+        """, (wp_post_id, utcnow().isoformat(), id_subasta))
         self.conn.commit()
 
     def get_subastas_no_publicadas(self) -> List[Subasta]:
@@ -532,7 +543,7 @@ class Database:
                 estado = ?,
                 fecha_actualizacion = ?
             WHERE id_subasta = ?
-        """, (nuevo_estado, datetime.now().isoformat(), id_subasta))
+        """, (nuevo_estado, utcnow().isoformat(), id_subasta))
         self.conn.commit()
 
     def get_subastas_para_verificar(self) -> List[dict]:
