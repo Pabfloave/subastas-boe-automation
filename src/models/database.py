@@ -11,6 +11,22 @@ import json
 from .subasta import Subasta, Bien
 
 
+def _to_float(v) -> float:
+    """Convierte Decimal/int/str a float; None u objetos vacíos → 0.0.
+
+    El parser del BOE puede devolver None cuando un campo numérico está
+    ausente en el HTML. SQLite acepta REAL nullable, pero los INSERT/UPDATE
+    de este módulo siempre pasan el valor por float() — que crashea con
+    None. Este helper centraliza la coerción defensiva.
+    """
+    if v is None:
+        return 0.0
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 class Database:
     """Gestiona la base de datos SQLite de subastas."""
 
@@ -111,6 +127,12 @@ class Database:
         except sqlite3.OperationalError:
             pass
 
+        # Migrar tabla subastas existente si falta puja_maxima
+        try:
+            cursor.execute("ALTER TABLE subastas ADD COLUMN puja_maxima REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+
         # Tabla de log de sincronización
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sync_log (
@@ -186,6 +208,7 @@ class Database:
             wp_post_id=row["wp_post_id"],
             hash_datos=row["hash_datos"] or "",
             activa=bool(row["activa"]),
+            puja_maxima=Decimal(str(row["puja_maxima"] or 0)) if "puja_maxima" in row.keys() else Decimal("0"),
         )
 
     def _get_bienes(self, id_subasta: str) -> List[Bien]:
@@ -243,8 +266,8 @@ class Database:
                 importe_deposito, anuncio_boe, lotes, url_detalle,
                 url_edicto, url_certificacion_cargas, autoridad_gestora,
                 localidad_juzgado, telefono_juzgado, fax_juzgado, email_juzgado,
-                fecha_scraping, hash_datos, activa
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fecha_scraping, hash_datos, activa, puja_maxima
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             subasta.id_subasta,
             subasta.tipo_subasta,
@@ -252,12 +275,12 @@ class Database:
             subasta.cuenta_expediente,
             subasta.fecha_inicio.isoformat() if subasta.fecha_inicio else None,
             subasta.fecha_conclusion.isoformat() if subasta.fecha_conclusion else None,
-            float(subasta.cantidad_reclamada),
-            float(subasta.valor_subasta),
-            float(subasta.tasacion),
-            float(subasta.puja_minima),
-            float(subasta.tramos_pujas),
-            float(subasta.importe_deposito),
+            _to_float(subasta.cantidad_reclamada),
+            _to_float(subasta.valor_subasta),
+            _to_float(subasta.tasacion),
+            _to_float(subasta.puja_minima),
+            _to_float(subasta.tramos_pujas),
+            _to_float(subasta.importe_deposito),
             subasta.anuncio_boe,
             subasta.lotes,
             subasta.url_detalle,
@@ -271,6 +294,7 @@ class Database:
             subasta.fecha_scraping.isoformat(),
             subasta.hash_datos,
             1 if subasta.activa else 0,
+            _to_float(subasta.puja_maxima),
         ))
 
         subasta_id = cursor.lastrowid
@@ -308,12 +332,12 @@ class Database:
             bien.situacion_posesoria,
             bien.visitable,
             bien.cargas,
-            float(bien.valor_tasacion),
+            _to_float(bien.valor_tasacion),
             json.dumps(bien.fotos_urls),
-            float(bien.valor_subasta_lote),
-            float(bien.importe_deposito_lote),
-            float(bien.puja_minima_lote),
-            float(bien.tramos_pujas_lote),
+            _to_float(bien.valor_subasta_lote),
+            _to_float(bien.importe_deposito_lote),
+            _to_float(bien.puja_minima_lote),
+            _to_float(bien.tramos_pujas_lote),
         ))
 
     def update_subasta(self, subasta: Subasta):
@@ -348,7 +372,8 @@ class Database:
                 email_juzgado = ?,
                 fecha_actualizacion = ?,
                 hash_datos = ?,
-                activa = ?
+                activa = ?,
+                puja_maxima = ?
             WHERE id_subasta = ?
         """, (
             subasta.tipo_subasta,
@@ -356,12 +381,12 @@ class Database:
             subasta.cuenta_expediente,
             subasta.fecha_inicio.isoformat() if subasta.fecha_inicio else None,
             subasta.fecha_conclusion.isoformat() if subasta.fecha_conclusion else None,
-            float(subasta.cantidad_reclamada),
-            float(subasta.valor_subasta),
-            float(subasta.tasacion),
-            float(subasta.puja_minima),
-            float(subasta.tramos_pujas),
-            float(subasta.importe_deposito),
+            _to_float(subasta.cantidad_reclamada),
+            _to_float(subasta.valor_subasta),
+            _to_float(subasta.tasacion),
+            _to_float(subasta.puja_minima),
+            _to_float(subasta.tramos_pujas),
+            _to_float(subasta.importe_deposito),
             subasta.anuncio_boe,
             subasta.lotes,
             subasta.url_detalle,
@@ -375,6 +400,7 @@ class Database:
             subasta.fecha_actualizacion.isoformat(),
             subasta.hash_datos,
             1 if subasta.activa else 0,
+            _to_float(subasta.puja_maxima),
             subasta.id_subasta,
         ))
 
@@ -523,16 +549,26 @@ class Database:
             subastas.append(subasta)
         return subastas
 
-    def marcar_subasta_inactiva(self, id_subasta: str, nuevo_estado: str = "Finalizada"):
-        """Marca una subasta como inactiva y actualiza su estado."""
+    def marcar_subasta_inactiva(self, id_subasta: str, nuevo_estado: str = "Finalizada", puja_maxima: Decimal = None):
+        """Marca una subasta como inactiva y actualiza su estado y opcionalmente su puja máxima."""
         cursor = self.conn.cursor()
-        cursor.execute("""
-            UPDATE subastas SET
-                activa = 0,
-                estado = ?,
-                fecha_actualizacion = ?
-            WHERE id_subasta = ?
-        """, (nuevo_estado, datetime.now().isoformat(), id_subasta))
+        if puja_maxima is not None:
+            cursor.execute("""
+                UPDATE subastas SET
+                    activa = 0,
+                    estado = ?,
+                    puja_maxima = ?,
+                    fecha_actualizacion = ?
+                WHERE id_subasta = ?
+            """, (nuevo_estado, _to_float(puja_maxima), datetime.now().isoformat(), id_subasta))
+        else:
+            cursor.execute("""
+                UPDATE subastas SET
+                    activa = 0,
+                    estado = ?,
+                    fecha_actualizacion = ?
+                WHERE id_subasta = ?
+            """, (nuevo_estado, datetime.now().isoformat(), id_subasta))
         self.conn.commit()
 
     def get_subastas_para_verificar(self) -> List[dict]:
