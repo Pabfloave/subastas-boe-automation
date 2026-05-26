@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  db:
+    image: mariadb:11
+    container_name: subastas-wp-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: wp
+      MYSQL_USER: wp
+      MYSQL_PASSWORD: wp
+    volumes:
+      - ./.docker/db:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  wp:
+    image: wordpress:6.4-php8.2-apache
+    container_name: subastas-wp
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: wp
+      WORDPRESS_DB_NAME: wp
+      WORDPRESS_DEBUG: "1"
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', 'http://localhost:8080');
+        define('WP_SITEURL', 'http://localhost:8080');
+        define('WP_ENVIRONMENT_TYPE', 'staging');
+    volumes:
+      - ./.docker/wp:/var/www/html
+      - ./wordpress/subastas-meta-api.php:/var/www/html/wp-content/plugins/subastas-meta-api/subastas-meta-api.php:ro
+    ports:
+      - "127.0.0.1:8080:80"
+
+  wp-cli:
+    image: wordpress:cli-php8.2
+    container_name: subastas-wp-cli
+    depends_on:
+      - wp
+    user: "33:33"
+    volumes:
+      - ./.docker/wp:/var/www/html
+    profiles:
+      - cli
