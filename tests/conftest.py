@@ -78,6 +78,26 @@ def mock_client() -> MockClient:
     return MockClient()
 
 
+@pytest.fixture(autouse=True)
+def _no_network_ssr(monkeypatch):
+    """Evita que las llamadas a `_fetch_posts_ssr` salgan a la red durante
+    los tests. Devuelve `([], 0)` para que el HTML SSR se genere con cero
+    cards y el JS hidratante haga todo el trabajo en cliente (caso baseline).
+
+    Tests específicos de SSR pueden over-ride esto con su propio
+    monkeypatch.setattr para devolver posts ficticios.
+    """
+    try:
+        from src.wordpress.page_generator import ProvinciaPageGenerator
+        monkeypatch.setattr(
+            ProvinciaPageGenerator,
+            "_fetch_posts_ssr",
+            lambda self, slug, limit=20: ([], 0),
+        )
+    except ImportError:
+        pass  # tests sin page_generator también funcionan
+
+
 def _build_bien(**overrides: Any) -> Bien:
     """Crea un Bien con valores razonables que se pueden sobrescribir."""
     defaults: Dict[str, Any] = {
