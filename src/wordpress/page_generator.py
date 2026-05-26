@@ -15,6 +15,19 @@ from config.provinces import PROVINCIAS_ESPANA
 _CATEGORIA_CACHE = {}
 
 
+def _build_seo_title(base: str, suffix: str = "", max_len: int = 60) -> str:
+    """Concatena `base+suffix` si cabe en `max_len`; si no, devuelve `base`
+    (también truncado si fuera necesario con elipsis). Garantiza que el title
+    nunca exceda los 60 caracteres recomendados por Google.
+    """
+    full = base + suffix
+    if len(full) <= max_len:
+        return full
+    if len(base) <= max_len:
+        return base
+    return base[: max_len - 1] + "…"
+
+
 class ProvinciaPageGenerator:
     """Genera páginas de provincia para WordPress."""
 
@@ -180,7 +193,10 @@ class ProvinciaPageGenerator:
         if len(meta_description) > 160:
             meta_description = meta_description[:157] + "..."
 
-        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
+        meta_title = _build_seo_title(
+            base=f"Subastas Judiciales en {nombre} {current_year}",
+            suffix=" | Inmuebles BOE",
+        )
 
         # JSON-LD structured data
         breadcrumb_schema = {
@@ -1063,7 +1079,10 @@ class ProvinciaPageGenerator:
         current_year = datetime.now().year
         page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
 
-        meta_title = f"Subastas Judiciales en {nombre} {current_year} | Inmuebles BOE - Comprar en Subasta"
+        meta_title = _build_seo_title(
+            base=f"Subastas Judiciales en {nombre} {current_year}",
+            suffix=" | Inmuebles BOE",
+        )
         meta_desc = (
             f"Subastas judiciales en {nombre} {current_year}. "
             f"Listado actualizado de pisos, casas, locales y fincas embargadas en {nombre} ({comunidad}). "
@@ -1074,21 +1093,11 @@ class ProvinciaPageGenerator:
         focus_kw = f"subastas judiciales {nombre.lower()}"
 
         meta_fields = {
-            # Rank Math
             "rank_math_title": meta_title,
             "rank_math_description": meta_desc,
             "rank_math_focus_keyword": focus_kw,
             "rank_math_canonical_url": page_url,
             "rank_math_robots": ["index", "follow", "max-snippet:-1", "max-image-preview:large"],
-            # Yoast
-            "_yoast_wpseo_title": meta_title,
-            "_yoast_wpseo_metadesc": meta_desc,
-            "_yoast_wpseo_focuskw": focus_kw,
-            "_yoast_wpseo_canonical": page_url,
-            "_yoast_wpseo_opengraph-title": meta_title,
-            "_yoast_wpseo_opengraph-description": meta_desc,
-            "_yoast_wpseo_twitter-title": meta_title,
-            "_yoast_wpseo_twitter-description": meta_desc,
         }
 
         try:
@@ -1218,7 +1227,10 @@ class ProvinciaPageGenerator:
         current_year = datetime.now().year
         site_url = "https://comprarensubasta.com"
         page_url = f"{site_url}/subastas-judiciales/"
-        meta_title = f"Subastas Judiciales en Espa\u00f1a {current_year} - Todas las Provincias | Comprar en Subasta"
+        meta_title = _build_seo_title(
+            base=f"Subastas Judiciales en Espa\u00f1a {current_year}",
+            suffix=" | Todas las Provincias",
+        )
         meta_description = (
             f"Subastas judiciales de inmuebles en las 52 provincias de Espa\u00f1a {current_year}. "
             "Pisos, casas, locales y fincas embargadas del BOE. Listado actualizado diariamente."
@@ -1605,7 +1617,10 @@ class ProvinciaPageGenerator:
     def _set_index_seo_meta(self, page_id: int):
         """Sets SEO meta fields for the index page."""
         current_year = datetime.now().year
-        meta_title = f"Subastas Judiciales en España {current_year} - Todas las Provincias | Comprar en Subasta"
+        meta_title = _build_seo_title(
+            base=f"Subastas Judiciales en España {current_year}",
+            suffix=" | Todas las Provincias",
+        )
         meta_desc = (
             f"Subastas judiciales de inmuebles en las 52 provincias de España {current_year}. "
             "Pisos, casas, locales y fincas embargadas del BOE. Listado actualizado diariamente."
@@ -1618,12 +1633,7 @@ class ProvinciaPageGenerator:
             "rank_math_description": meta_desc,
             "rank_math_focus_keyword": focus_kw,
             "rank_math_canonical_url": page_url,
-            "_yoast_wpseo_title": meta_title,
-            "_yoast_wpseo_metadesc": meta_desc,
-            "_yoast_wpseo_focuskw": focus_kw,
-            "_yoast_wpseo_canonical": page_url,
-            "_yoast_wpseo_opengraph-title": meta_title,
-            "_yoast_wpseo_opengraph-description": meta_desc,
+            "rank_math_robots": ["index", "follow", "max-snippet:-1", "max-image-preview:large"],
         }
 
         try:
