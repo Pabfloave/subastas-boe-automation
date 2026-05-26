@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<style>
+@page {
+  size: A4;
+  margin: 22mm 18mm 26mm 18mm;
+  @bottom-left {
+    content: "CAFAVE Investment · comprarensubasta.com";
+    font-family: 'Helvetica', sans-serif;
+    font-size: 8.5pt;
+    color: #6b7280;
+  }
+  @bottom-right {
+    content: "Página " counter(page) " de " counter(pages);
+    font-family: 'Helvetica', sans-serif;
+    font-size: 8.5pt;
+    color: #6b7280;
+  }
+}
+@page :first {
+  margin: 0;
+  @bottom-left { content: ""; }
+  @bottom-right { content: ""; }
+}
+
+body {
+  font-family: 'Helvetica', 'Arial', sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: #1f2937;
+}
+
+/* Cover */
+.cover {
+  page-break-after: always;
+  height: 297mm;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #0f1e3a 0%, #1d3b6e 60%, #2563eb 100%);
+  color: #fff;
+  display: block;
+  position: relative;
+}
+.cover-inner {
+  padding: 38mm 22mm 22mm 22mm;
+  height: 100%;
+  box-sizing: border-box;
+}
+.cover .brand {
+  font-size: 11pt;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #93c5fd;
+  margin-bottom: 14mm;
+}
+.cover h1 {
+  font-size: 30pt;
+  line-height: 1.15;
+  margin: 0 0 8mm 0;
+  font-weight: 700;
+  color: #ffffff;
+}
+.cover h2 {
+  font-size: 13pt;
+  font-weight: 400;
+  color: #cbd5e1;
+  margin: 0 0 60mm 0;
+  line-height: 1.4;
+}
+.cover .badge {
+  display: inline-block;
+  border: 1px solid #93c5fd;
+  border-radius: 100px;
+  padding: 3mm 6mm;
+  font-size: 9.5pt;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #dbeafe;
+  margin-bottom: 6mm;
+}
+.cover .meta {
+  font-size: 10pt;
+  color: #cbd5e1;
+  line-height: 1.7;
+}
+.cover .meta strong { color: #fff; }
+.cover-footer {
+  position: absolute;
+  bottom: 18mm;
+  left: 22mm;
+  right: 22mm;
+  font-size: 9pt;
+  color: #cbd5e1;
+  border-top: 1px solid rgba(255,255,255,0.18);
+  padding-top: 6mm;
+}
+
+/* Body content */
+h1 {
+  font-size: 20pt;
+  color: #0f1e3a;
+  margin: 4mm 0 4mm 0;
+  page-break-before: always;
+  border-bottom: 3px solid #2563eb;
+  padding-bottom: 2mm;
+}
+h1:first-of-type { page-break-before: avoid; }
+
+h2 {
+  font-size: 14pt;
+  color: #1d3b6e;
+  margin: 8mm 0 3mm 0;
+  padding-left: 4mm;
+  border-left: 4px solid #2563eb;
+}
+
+h3 {
+  font-size: 11.5pt;
+  color: #0f1e3a;
+  margin: 5mm 0 2mm 0;
+}
+
+p { margin: 0 0 3mm 0; }
+strong { color: #0f1e3a; }
+em { color: #475569; }
+hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 6mm 0;
+}
+
+/* Checklist items */
+.item {
+  margin: 3mm 0 4mm 0;
+  padding: 3mm 4mm 3mm 11mm;
+  border-left: 2px solid #93c5fd;
+  background: #f8fafc;
+  position: relative;
+  page-break-inside: avoid;
+}
+.item:before {
+  content: "";
+  display: block;
+  position: absolute;
+  left: 3mm;
+  top: 4mm;
+  width: 4mm;
+  height: 4mm;
+  border: 1.4px solid #2563eb;
+  border-radius: 0.8mm;
+  background: #fff;
+}
+.item-title {
+  font-weight: 700;
+  color: #0f1e3a;
+  margin: 0 0 1.5mm 0;
+  display: block;
+}
+.item-note {
+  font-size: 9.5pt;
+  color: #475569;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Intro paragraph */
+.intro {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 5mm;
+  border-radius: 1mm;
+  margin: 0 0 8mm 0;
+  font-size: 10pt;
+}
+
+/* CTA box */
+.cta {
+  background: #0f1e3a;
+  color: #fff;
+  padding: 8mm;
+  border-radius: 2mm;
+  margin: 8mm 0;
+  page-break-inside: avoid;
+}
+.cta h3 { color: #fff; margin: 0 0 3mm 0; }
+.cta p { color: #cbd5e1; margin: 0 0 3mm 0; font-size: 10pt; }
+.cta .price {
+  display: inline-block;
+  background: #2563eb;
+  color: #fff;
+  padding: 2mm 5mm;
+  font-weight: 700;
+  border-radius: 1mm;
+  font-size: 11pt;
+}
+.cta a { color: #93c5fd; text-decoration: none; }
+
+/* Legal footer */
+.legal {
+  font-size: 8.5pt;
+  color: #6b7280;
+  font-style: italic;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 4mm;
+  margin-top: 10mm;
+}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<section class="cover">
+  <div class="cover-inner">
+    <div class="brand">CAFAVE INVESTMENT</div>
+
+    <div class="badge">Guía profesional · {{ year }}</div>
+
+    <h1>Checklist 47 puntos<br>antes de pujar</h1>
+    <h2>La verificación jurídica previa<br>que minimiza el riesgo de tu inversión<br>en una subasta judicial del BOE</h2>
+
+    <div class="meta">
+      <strong>Edición:</strong> {{ year }}<br>
+      <strong>Autor:</strong> Equipo jurídico CAFAVE Investment<br>
+      <strong>Web:</strong> comprarensubasta.com<br>
+      <strong>Servicio destacado:</strong> Informe jurídico previo · 72,60 € · 48h
+    </div>
+
+    <div class="cover-footer">
+      Este documento es divulgativo y no sustituye al asesoramiento jurídico individualizado.<br>
+      © {{ year }} CAFAVE Investment. Distribución gratuita. Prohibida su modificación.
+    </div>
+  </div>
+</section>
+
+<!-- CONTENT -->
+{{ body_html | safe }}
+
+<div class="legal">
+  CAFAVE Investment · Abogados colegiados · ICAS nº [pendiente]<br>
+  Aviso legal: este documento tiene carácter divulgativo y no constituye asesoramiento jurídico individualizado. Para una opinión legal vinculante, contacte con un abogado colegiado.<br>
+  Política de privacidad y aviso legal: comprarensubasta.com/aviso-legal
+</div>
+
+</body>
+</html>

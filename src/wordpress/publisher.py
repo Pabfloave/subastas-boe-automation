@@ -978,6 +978,13 @@ class WordPressPublisher:
         </a>
     </div>
 
+    <!-- Lead magnet: checklist 47 puntos (gated PDF) -->
+    <div class="subasta-checklist-banner" style="margin:28px 0;">
+
+[cafave_checklist_banner url="/recursos/checklist-47-puntos"]
+
+    </div>
+
     <!-- Enlace BOE -->
     <div class="subasta-enlace-boe">
         <p>
