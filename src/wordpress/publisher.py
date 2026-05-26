@@ -52,7 +52,10 @@ class WordPressPublisher:
         content = self._generate_content(subasta)
         categories = self._get_categories(subasta)
         tags = self._get_tags(subasta)
-        meta = self._generate_meta(subasta)
+        # Pasamos `existing_post` para que la canonical preserve la URL ya
+        # indexada (slug histórico) en updates y use el slug determinista en
+        # posts nuevos.
+        meta = self._generate_meta(subasta, existing_post=existing_post)
 
         post_data = {
             "title": title,
@@ -471,7 +474,7 @@ class WordPressPublisher:
         def format_money(value):
             try:
                 return f"{float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
-            except:
+            except (TypeError, ValueError):
                 return "No disponible"
 
         # Formatear fechas
@@ -480,9 +483,10 @@ class WordPressPublisher:
                 return dt.strftime("%d/%m/%Y a las %H:%M")
             return "No disponible"
 
-        # Estado con estilo
-        estado_class = "en-curso" if "celebr" in subasta.estado.lower() else "proxima"
-        estado_texto = subasta.estado or "En curso"
+        # Estado con estilo. `subasta.estado` puede ser None si el scraper
+        # no lo extrajo: usamos un default antes de aplicar `.lower()`.
+        estado_texto = (subasta.estado or "En curso").strip()
+        estado_class = "en-curso" if "celebr" in estado_texto.lower() else "proxima"
 
         # Datos para SEO contextual
         tipo_bien = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
@@ -869,7 +873,7 @@ class WordPressPublisher:
             <p class="mapa-direccion"><strong>Dirección:</strong> {direccion_original}</p>
             <a href="https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
                target="_blank"
-               rel="nofollow"
+               rel="noopener noreferrer nofollow"
                class="btn-mapa">
                 🗺️ Ver en Google Maps
             </a>
@@ -901,9 +905,9 @@ class WordPressPublisher:
         <ul class="lista-documentos">
 """
         if subasta.url_edicto:
-            html += f'            <li><a href="{subasta.url_edicto}" target="_blank" rel="nofollow">📜 Edicto de la Subasta (PDF)</a></li>\n'
+            html += f'            <li><a href="{subasta.url_edicto}" target="_blank" rel="noopener noreferrer nofollow">📜 Edicto de la Subasta (PDF)</a></li>\n'
         if subasta.url_certificacion_cargas:
-            html += f'            <li><a href="{subasta.url_certificacion_cargas}" target="_blank" rel="nofollow">📋 Certificación de Cargas (PDF)</a></li>\n'
+            html += f'            <li><a href="{subasta.url_certificacion_cargas}" target="_blank" rel="noopener noreferrer nofollow">📋 Certificación de Cargas (PDF)</a></li>\n'
 
         html += f"""        </ul>
     </div>
@@ -963,7 +967,7 @@ class WordPressPublisher:
     <div class="subasta-enlace-boe">
         <p>
             <a href="{subasta.url_detalle or f'https://subastas.boe.es/detalleSubasta.php?idSub={subasta.id_subasta}'}"
-               target="_blank" rel="nofollow">
+               target="_blank" rel="noopener noreferrer nofollow">
                 🔗 Ver subasta original en Portal BOE
             </a>
         </p>
@@ -1039,14 +1043,19 @@ class WordPressPublisher:
 
         return tags
 
-    def _generate_meta(self, subasta: Subasta) -> dict:
+    def _generate_meta(self, subasta: Subasta, existing_post: Optional[dict] = None) -> dict:
         """
         Genera los campos meta para el post, incluyendo SEO.
 
+        Args:
+            subasta: subasta a serializar.
+            existing_post: si ya existe en WP, se usa su `link` como canonical
+                para no romper URLs ya indexadas. Si es None, se construye
+                desde el slug determinista.
+
         Incluye campos para:
         - Datos internos de la subasta
-        - SEO (Yoast/Rank Math compatible)
-        - Open Graph para redes sociales
+        - SEO (Rank Math — Yoast eliminado, ver decisión D3 de PLAN_SEO.md)
         - Información de múltiples lotes
         """
         bien = subasta.get_bien_principal()
@@ -1058,6 +1067,15 @@ class WordPressPublisher:
         tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "Inmueble"
         localidad = bien.localidad if bien and bien.localidad else "España"
         provincia = bien.provincia if bien and bien.provincia else ""
+
+        # URL canónica del post. En updates preservamos `existing_post["link"]`
+        # para no romper URLs antiguas ya indexadas (los slugs históricos
+        # pueden diferir del slug determinista actual). En posts nuevos, el
+        # slug determinista coincide con la canonical.
+        canonical_slug = self.client.make_subasta_slug(subasta.id_subasta)
+        canonical_url = (existing_post or {}).get("link") or (
+            f"{settings.WP_URL.rstrip('/')}/{canonical_slug}/"
+        )
 
         # Focus keyword para SEO
         focus_keyword = f"subasta {tipo.lower()} {localidad.lower()}"
@@ -1095,19 +1113,12 @@ class WordPressPublisher:
             "_subasta_fecha_fin": subasta.fecha_conclusion.isoformat() if subasta.fecha_conclusion else "",
             "_subasta_num_lotes": str(num_lotes),
 
-            # SEO - Yoast compatible
-            "_yoast_wpseo_metadesc": meta_description,
-            "_yoast_wpseo_focuskw": focus_keyword,
-            "_yoast_wpseo_opengraph-title": og_title,
-            "_yoast_wpseo_opengraph-description": meta_description,
-            "_yoast_wpseo_twitter-title": og_title,
-            "_yoast_wpseo_twitter-description": meta_description,
-
-            # SEO - Rank Math compatible
+            # SEO - Rank Math (Yoast eliminado, decisión D3 de PLAN_SEO.md)
+            "rank_math_title": seo_title,
             "rank_math_description": meta_description,
             "rank_math_focus_keyword": focus_keyword,
-            "rank_math_title": seo_title,
-            "rank_math_canonical_url": "",
+            "rank_math_canonical_url": canonical_url,
+            "rank_math_robots": ["index", "follow", "max-snippet:-1", "max-image-preview:large"],
             # Disable Rank Math auto-schema (we generate our own JSON-LD)
             "rank_math_rich_snippet": "off",
         }

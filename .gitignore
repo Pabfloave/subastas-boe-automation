@@ -11,6 +11,14 @@ env/
 
 # Environment variables (contiene credenciales)
 .env
+.env.staging
+.env.production
+
+# Docker WP staging (volúmenes locales)
+.docker/
+
+# OG image cache (Sprint 2)
+.cache/
 
 # Base de datos local (cualquier .db excepto la de producción)
 data/*.db

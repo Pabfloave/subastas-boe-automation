@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Subastas Meta API
  * Description: API REST de campos meta + autor CAFAVE + fechas en español + auto-respuesta al inversor (WPForms) + BBDD de inversores con exportación a Excel/CSV.
- * Version: 1.3
+ * Version: 1.4
  * Author: CAFAVE INVESTMENT
  */
 
@@ -21,6 +21,7 @@ function subastas_meta_keys() {
     return array(
         '_subasta_id', '_subasta_tipo', '_subasta_estado', '_subasta_valor',
         '_subasta_deposito', '_subasta_fecha_inicio', '_subasta_fecha_fin',
+        '_subasta_num_lotes',
         '_bien_tipo', '_bien_direccion', '_bien_localidad', '_bien_provincia', '_bien_cp',
     );
 }
