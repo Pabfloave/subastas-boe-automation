@@ -47,15 +47,24 @@ class WordPressPublisher:
         # Verificar si ya existe (slug determinista + búsqueda por contenido)
         existing_post = self._find_existing_post(subasta.id_subasta)
 
+        # OG image: si Pillow está disponible y el upload tiene éxito,
+        # tendremos URL pública + media_id; en caso contrario, los
+        # generadores caen a un og:image por defecto del sitio (sin romper).
+        og_image_url, og_image_id = self._get_or_create_og_image(subasta)
+
         # Generar contenido
         title = self._generate_title(subasta)
-        content = self._generate_content(subasta)
+        content = self._generate_content(subasta, og_image_url=og_image_url)
         categories = self._get_categories(subasta)
         tags = self._get_tags(subasta)
         # Pasamos `existing_post` para que la canonical preserve la URL ya
         # indexada (slug histórico) en updates y use el slug determinista en
         # posts nuevos.
-        meta = self._generate_meta(subasta, existing_post=existing_post)
+        meta = self._generate_meta(
+            subasta,
+            existing_post=existing_post,
+            og_image_url=og_image_url,
+        )
 
         post_data = {
             "title": title,
@@ -65,6 +74,8 @@ class WordPressPublisher:
             "tags": tags,
             "meta": meta,
         }
+        if og_image_id:
+            post_data["featured_media"] = og_image_id
 
         if existing_post and update_if_exists:
             # Actualizar post existente. NO tocamos el slug para no romper
@@ -86,6 +97,34 @@ class WordPressPublisher:
     def _find_existing_post(self, id_subasta: str) -> Optional[dict]:
         """Busca un post existente para una subasta."""
         return self.client.get_post_by_subasta_id(id_subasta)
+
+    def _get_or_create_og_image(self, subasta: Subasta) -> tuple:
+        """Genera y sube la OG image. Devuelve (url, media_id) o (None, None).
+
+        Si Pillow no está disponible o el upload falla, no rompe el flujo:
+        devuelve (None, None) y el caller usa el og:image default.
+        """
+        try:
+            from .og_image import get_or_create_og_image
+        except ImportError:
+            return None, None
+
+        bien = subasta.get_bien_principal()
+        tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "Inmueble"
+        localidad = bien.localidad if bien and bien.localidad else "España"
+        provincia = bien.provincia if bien and bien.provincia else ""
+
+        precio_str = "Consultar"
+        if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
+            precio_str = f"{float(subasta.valor_subasta):,.0f}€".replace(",", ".")
+
+        return get_or_create_og_image(
+            tipo=tipo,
+            localidad=localidad,
+            precio_str=precio_str,
+            provincia=provincia,
+            wp_client=self.client,
+        )
 
     def _generate_title(self, subasta: Subasta) -> str:
         """
@@ -188,12 +227,15 @@ class WordPressPublisher:
 
         return descripcion
 
-    def _generate_schema_markup(self, subasta: Subasta) -> str:
+    def _generate_schema_markup(self, subasta: Subasta, og_image_url: Optional[str] = None) -> str:
         """
         Genera Schema.org JSON-LD para rich snippets en Google.
 
         Incluye: RealEstateListing, BreadcrumbList, LegalService.
         NO incluye BlogPosting (Rank Math lo desactiva via meta).
+
+        Si `og_image_url` se provee, se añade al schema RealEstateListing.image[]
+        y al organizationSchema (Sprint 2 — Acción 3).
         """
         import json
 
@@ -245,6 +287,21 @@ class WordPressPublisher:
         }
 
         # Schema 2: RealEstateListing
+        # dateModified ayuda a Google a entender la frescura del listado.
+        # image[] habilita rich snippet visual (Sprint 2 — A3).
+        offer = {
+            "@type": "Offer",
+            "price": precio,
+            "priceCurrency": "EUR",
+            "availability": "https://schema.org/InStock",
+            "seller": {
+                "@type": "Organization",
+                "name": subasta.autoridad_gestora or "Portal de Subastas BOE",
+            },
+        }
+        if fecha_disponible:
+            offer["validThrough"] = fecha_disponible
+
         schema = {
             "@context": "https://schema.org",
             "@type": "RealEstateListing",
@@ -252,18 +309,11 @@ class WordPressPublisher:
             "description": self._generate_meta_description(subasta),
             "url": subasta.url_detalle or f"https://subastas.boe.es/detalleSubasta.php?idSub={subasta.id_subasta}",
             "datePosted": subasta.fecha_inicio.strftime("%Y-%m-%d") if subasta.fecha_inicio else "",
-            "offers": {
-                "@type": "Offer",
-                "price": precio,
-                "priceCurrency": "EUR",
-                "availability": "https://schema.org/InStock",
-                "validThrough": fecha_disponible,
-                "seller": {
-                    "@type": "Organization",
-                    "name": subasta.autoridad_gestora or "Portal de Subastas BOE",
-                }
-            }
+            "dateModified": datetime.now().strftime("%Y-%m-%d"),
+            "offers": offer,
         }
+        if og_image_url:
+            schema["image"] = [og_image_url]
 
         # Añadir ubicación si hay datos
         if direccion or localidad:
@@ -303,95 +353,78 @@ class WordPressPublisher:
 {json.dumps(org_schema, ensure_ascii=False, indent=2)}
 </script>'''
 
-    def _generate_faq_schema(self, subasta: Subasta) -> str:
-        """
-        Genera FAQ Schema JSON-LD para mejorar visibilidad en Google y respuestas de IAs.
+    def _faq_items(self, subasta: Subasta) -> List[tuple]:
+        """Fuente única de las FAQs (Sprint 2 — Acción 8).
 
-        Las preguntas frecuentes se generan dinámicamente basadas en los datos de la subasta.
-        Esto ayuda tanto a Google (rich snippets FAQ) como a IAs (ChatGPT, Perplexity, etc.)
-        """
-        import json
+        Tanto `_generate_faq_schema` (JSON-LD) como `_generate_faq_html`
+        (HTML visible) consumen esta lista. Esto garantiza que el número y
+        contenido de preguntas siempre coincide — requisito de Google Rich
+        Results para FAQPage (mismatch = pérdida del snippet).
 
+        Cada elemento es una tupla `(question, answer)` con strings ya
+        personalizados con los datos de la subasta.
+        """
         bien = subasta.get_bien_principal()
 
-        # Datos para personalizar las FAQs
         tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
         localidad = bien.localidad if bien and bien.localidad else "esta ubicación"
-        provincia = bien.provincia if bien and bien.provincia else "España"
 
-        # Formatear precio
         precio_str = "consultar en la documentación"
         if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
-            precio = float(subasta.valor_subasta)
-            precio_str = f"{precio:,.0f}€".replace(",", ".")
+            precio_str = f"{float(subasta.valor_subasta):,.0f}€".replace(",", ".")
 
-        # Formatear depósito
         deposito_str = "el 5% del valor de subasta"
         if subasta.importe_deposito and float(subasta.importe_deposito) > 0:
-            deposito = float(subasta.importe_deposito)
-            deposito_str = f"{deposito:,.0f}€".replace(",", ".")
+            deposito_str = f"{float(subasta.importe_deposito):,.0f}€".replace(",", ".")
 
-        # Formatear fecha
         fecha_str = "consultar en el BOE"
         if subasta.fecha_conclusion:
             fecha_str = subasta.fecha_conclusion.strftime("%d/%m/%Y a las %H:%M")
 
-        # Generar FAQs dinámicas
+        return [
+            (
+                f"¿Cuál es el valor de salida de esta subasta de {tipo} en {localidad}?",
+                f"El valor de salida de esta subasta es de {precio_str}. Este es el precio mínimo desde el que pueden comenzar las pujas. Recuerda que en subastas judiciales puedes adquirir inmuebles por debajo del valor de mercado.",
+            ),
+            (
+                "¿Cuánto depósito necesito para participar en esta subasta?",
+                f"Para participar en esta subasta necesitas depositar {deposito_str}. Este depósito se realiza a través del Portal de Subastas del BOE y se devuelve si no resultas adjudicatario.",
+            ),
+            (
+                "¿Hasta cuándo puedo pujar en esta subasta?",
+                f"Esta subasta finaliza el {fecha_str}. Te recomendamos registrarte con antelación en el Portal de Subastas del BOE y tener preparada la documentación necesaria.",
+            ),
+            (
+                "¿Qué documentación necesito para participar en una subasta judicial?",
+                "Para participar necesitas: DNI/NIE vigente, certificado digital o Cl@ve, cuenta bancaria para el depósito, y estar dado de alta en el Portal de Subastas del BOE. Recomendamos también revisar el edicto y la certificación de cargas antes de pujar.",
+            ),
+            (
+                f"¿Es seguro comprar un {tipo} en subasta judicial?",
+                "Sí, las subastas judiciales son procedimientos legales supervisados por juzgados. Sin embargo, es fundamental analizar las cargas registrales y la situación posesoria antes de pujar. Te recomendamos contar con asesoramiento legal especializado para evitar sorpresas.",
+            ),
+            (
+                "¿Qué pasa si gano la subasta? ¿Cuáles son los siguientes pasos?",
+                "Si ganas la subasta, deberás pagar el resto del precio en el plazo establecido (normalmente 20 días hábiles), liquidar los impuestos correspondientes (ITP o IVA), y esperar el Decreto de Adjudicación para inscribir la propiedad en el Registro. Un abogado especializado puede gestionar todo el proceso.",
+            ),
+        ]
+
+    def _generate_faq_schema(self, subasta: Subasta) -> str:
+        """FAQ Schema JSON-LD (consume `_faq_items` para no descompensar
+        con la versión HTML — Acción 8)."""
+        import json
+
         faqs = [
             {
                 "@type": "Question",
-                "name": f"¿Cuál es el valor de salida de esta subasta de {tipo} en {localidad}?",
-                "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": f"El valor de salida de esta subasta es de {precio_str}. Este es el precio mínimo desde el que pueden comenzar las pujas. Recuerda que en subastas judiciales puedes adquirir inmuebles por debajo del valor de mercado."
-                }
-            },
-            {
-                "@type": "Question",
-                "name": f"¿Cuánto depósito necesito para participar en esta subasta?",
-                "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": f"Para participar en esta subasta necesitas depositar {deposito_str}. Este depósito se realiza a través del Portal de Subastas del BOE y se devuelve si no resultas adjudicatario."
-                }
-            },
-            {
-                "@type": "Question",
-                "name": f"¿Hasta cuándo puedo pujar en esta subasta?",
-                "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": f"Esta subasta finaliza el {fecha_str}. Te recomendamos registrarte con antelación en el Portal de Subastas del BOE y tener preparada la documentación necesaria."
-                }
-            },
-            {
-                "@type": "Question",
-                "name": "¿Qué documentación necesito para participar en una subasta judicial?",
-                "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "Para participar necesitas: DNI/NIE vigente, certificado digital o Cl@ve, cuenta bancaria para el depósito, y estar dado de alta en el Portal de Subastas del BOE. Recomendamos también revisar el edicto y la certificación de cargas antes de pujar."
-                }
-            },
-            {
-                "@type": "Question",
-                "name": f"¿Es seguro comprar un {tipo} en subasta judicial?",
-                "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": f"Sí, las subastas judiciales son procedimientos legales supervisados por juzgados. Sin embargo, es fundamental analizar las cargas registrales y la situación posesoria antes de pujar. Te recomendamos contar con asesoramiento legal especializado para evitar sorpresas."
-                }
-            },
-            {
-                "@type": "Question",
-                "name": "¿Qué pasa si gano la subasta? ¿Cuáles son los siguientes pasos?",
-                "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text": "Si ganas la subasta, deberás pagar el resto del precio en el plazo establecido (normalmente 20 días hábiles), liquidar los impuestos correspondientes (ITP o IVA), y esperar el Decreto de Adjudicación para inscribir la propiedad en el Registro. Un abogado especializado puede gestionar todo el proceso."
-                }
+                "name": q,
+                "acceptedAnswer": {"@type": "Answer", "text": a},
             }
+            for q, a in self._faq_items(subasta)
         ]
-
         faq_schema = {
             "@context": "https://schema.org",
             "@type": "FAQPage",
-            "mainEntity": faqs
+            "mainEntity": faqs,
         }
 
         return f'''<script type="application/ld+json">
@@ -399,66 +432,26 @@ class WordPressPublisher:
 </script>'''
 
     def _generate_faq_html(self, subasta: Subasta) -> str:
+        """HTML visible de las FAQs. Usa `<details>/<summary>` para mejor
+        a11y y conserva el mismo conjunto de preguntas que el JSON-LD.
         """
-        Genera el HTML visible de las FAQs para el contenido del post.
-
-        Este contenido complementa el FAQ Schema y mejora la experiencia del usuario.
-        """
-        bien = subasta.get_bien_principal()
-
-        tipo = bien.subtipo_bien if bien and bien.subtipo_bien else "inmueble"
-        localidad = bien.localidad if bien and bien.localidad else "esta ubicación"
-
-        # Formatear precio
-        precio_str = "consultar en la documentación"
-        if subasta.valor_subasta and float(subasta.valor_subasta) > 0:
-            precio = float(subasta.valor_subasta)
-            precio_str = f"{precio:,.0f}€".replace(",", ".")
-
-        # Formatear depósito
-        deposito_str = "el 5% del valor de subasta"
-        if subasta.importe_deposito and float(subasta.importe_deposito) > 0:
-            deposito = float(subasta.importe_deposito)
-            deposito_str = f"{deposito:,.0f}€".replace(",", ".")
-
-        # Formatear fecha
-        fecha_str = "consultar en el BOE"
-        if subasta.fecha_conclusion:
-            fecha_str = subasta.fecha_conclusion.strftime("%d/%m/%Y a las %H:%M")
-
+        items = self._faq_items(subasta)
+        body = "\n".join(
+            f'        <details class="faq-item">\n'
+            f'            <summary>{q}</summary>\n'
+            f'            <p>{a}</p>\n'
+            f'        </details>'
+            for q, a in items
+        )
         return f'''
-    <!-- FAQ Section - Optimizado para Google e IAs -->
-    <div class="subasta-faq">
+    <!-- FAQ Section — fuente única en _faq_items (Acción 8) -->
+    <section class="subasta-faq">
         <h2>Preguntas Frecuentes sobre esta Subasta</h2>
-
-        <div class="faq-item">
-            <h3>¿Cuál es el valor de salida de esta subasta de {tipo} en {localidad}?</h3>
-            <p>El valor de salida de esta subasta es de <strong>{precio_str}</strong>. Este es el precio mínimo desde el que pueden comenzar las pujas.</p>
-        </div>
-
-        <div class="faq-item">
-            <h3>¿Cuánto depósito necesito para participar?</h3>
-            <p>Para participar necesitas depositar <strong>{deposito_str}</strong>. Este depósito se realiza a través del Portal de Subastas del BOE.</p>
-        </div>
-
-        <div class="faq-item">
-            <h3>¿Hasta cuándo puedo pujar?</h3>
-            <p>Esta subasta finaliza el <strong>{fecha_str}</strong>. Regístrate con antelación en el Portal de Subastas del BOE.</p>
-        </div>
-
-        <div class="faq-item">
-            <h3>¿Qué documentación necesito?</h3>
-            <p>Necesitas DNI/NIE vigente, certificado digital o Cl@ve, y estar dado de alta en el Portal de Subastas del BOE.</p>
-        </div>
-
-        <div class="faq-item">
-            <h3>¿Es seguro comprar en subasta judicial?</h3>
-            <p>Sí, son procedimientos legales supervisados por juzgados. Recomendamos analizar las cargas y contar con asesoramiento legal.</p>
-        </div>
-    </div>
+{body}
+    </section>
 '''
 
-    def _generate_content(self, subasta: Subasta) -> str:
+    def _generate_content(self, subasta: Subasta, og_image_url: Optional[str] = None) -> str:
         """
         Genera el contenido HTML SEO-optimizado del post.
 
@@ -494,7 +487,7 @@ class WordPressPublisher:
         provincia = bien.provincia if bien and bien.provincia else "España"
 
         # Schema markup JSON-LD (RealEstateListing + Organization)
-        schema_markup = self._generate_schema_markup(subasta)
+        schema_markup = self._generate_schema_markup(subasta, og_image_url=og_image_url)
 
         # FAQ Schema JSON-LD (para Google e IAs)
         faq_schema = self._generate_faq_schema(subasta)
@@ -534,7 +527,7 @@ class WordPressPublisher:
     margin-bottom: 20px;
 }
 
-/* Estilos para el mapa */
+/* Estilos para la ubicación (link card, sin iframe — Sprint 2 A4) */
 .mapa-ubicacion {
     margin-top: 25px;
     padding: 20px;
@@ -546,31 +539,26 @@ class WordPressPublisher:
     color: #0369a1;
     margin-bottom: 15px;
 }
-.mapa-container {
-    margin-bottom: 15px;
+.mapa-link-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    background: #fff;
+    border: 1px solid #bae6fd;
     border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-.mapa-direccion {
-    color: #475569;
-    font-size: 0.95em;
-    margin-bottom: 15px;
-}
-.btn-mapa {
-    display: inline-block;
-    background: #0284c7;
-    color: white !important;
-    padding: 10px 20px;
-    border-radius: 6px;
     text-decoration: none;
-    font-weight: 500;
-    transition: background 0.2s;
+    color: #1e293b;
+    transition: background .2s, border-color .2s;
 }
-.btn-mapa:hover {
-    background: #0369a1;
-    color: white !important;
+.mapa-link-card:hover {
+    background: #f0f9ff;
+    border-color: #0284c7;
 }
+.mapa-link-card svg { flex-shrink: 0; }
+.mapa-link-text { display: flex; flex-direction: column; gap: 4px; }
+.mapa-link-text strong { color: #0f172a; }
+.mapa-link-text small { color: #0369a1; font-size: 0.9em; }
 
 /* Breadcrumbs */
 .breadcrumbs {
@@ -784,7 +772,9 @@ class WordPressPublisher:
                 if bien.direccion and bien.localidad:
                     # Limpiar dirección para Google Maps
                     import re
-                    import urllib.parse
+                    # urllib.parse ya importado al inicio del módulo. NO re-importar
+                    # aquí dentro: rompe el scope local de la función (urllib se
+                    # vuelve UnboundLocalVariable si la rama no se ejecuta).
 
                     def limpiar_direccion_para_maps(direccion: str) -> str:
                         """
@@ -855,27 +845,25 @@ class WordPressPublisher:
 
                     direccion_encoded = urllib.parse.quote(direccion_completa)
 
+                    # Sprint 2 — Acción 4: sustituimos iframe Google Maps
+                    # (~1 MB de JS de terceros, penaliza LCP y exige consent
+                    # RGPD) por una tarjeta de enlace con SVG inline. Mismo
+                    # affordance visual, peso ~0 KB, sin cookies.
                     html += f"""
-        <!-- Mapa de ubicación -->
+        <!-- Ubicación (link a Google Maps, sin iframe pesado — Sprint 2 A4) -->
         <div class="mapa-ubicacion">
             <h3>📍 Ubicación del Inmueble</h3>
-            <div class="mapa-container">
-                <iframe
-                    src="https://www.google.com/maps?q={direccion_encoded}&output=embed"
-                    width="100%"
-                    height="350"
-                    style="border:0; border-radius: 8px;"
-                    allowfullscreen=""
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade">
-                </iframe>
-            </div>
-            <p class="mapa-direccion"><strong>Dirección:</strong> {direccion_original}</p>
             <a href="https://www.google.com/maps/search/?api=1&query={direccion_encoded}"
-               target="_blank"
-               rel="noopener noreferrer nofollow"
-               class="btn-mapa">
-                🗺️ Ver en Google Maps
+               target="_blank" rel="noopener noreferrer nofollow"
+               class="mapa-link-card"
+               aria-label="Abrir ubicación de {bien.subtipo_bien or 'inmueble'} en {bien.localidad} en Google Maps">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" fill="#d97706"/>
+              </svg>
+              <span class="mapa-link-text">
+                <strong>{direccion_original}</strong>
+                <small>Pulsa para abrir en Google Maps →</small>
+              </span>
             </a>
         </div>
 """
@@ -1043,7 +1031,12 @@ class WordPressPublisher:
 
         return tags
 
-    def _generate_meta(self, subasta: Subasta, existing_post: Optional[dict] = None) -> dict:
+    def _generate_meta(
+        self,
+        subasta: Subasta,
+        existing_post: Optional[dict] = None,
+        og_image_url: Optional[str] = None,
+    ) -> dict:
         """
         Genera los campos meta para el post, incluyendo SEO.
 
@@ -1052,6 +1045,9 @@ class WordPressPublisher:
             existing_post: si ya existe en WP, se usa su `link` como canonical
                 para no romper URLs ya indexadas. Si es None, se construye
                 desde el slug determinista.
+            og_image_url: URL pública de la imagen OG (opcional). Si se provee,
+                se propaga a los campos `rank_math_facebook_image` y
+                `rank_math_twitter_image`.
 
         Incluye campos para:
         - Datos internos de la subasta
@@ -1122,6 +1118,12 @@ class WordPressPublisher:
             # Disable Rank Math auto-schema (we generate our own JSON-LD)
             "rank_math_rich_snippet": "off",
         }
+
+        # OG image (Sprint 2 — Acción 3). Si og_image_url es None, Rank Math
+        # caerá a su fallback (featured image del post o default del sitio).
+        if og_image_url:
+            meta["rank_math_facebook_image"] = og_image_url
+            meta["rank_math_twitter_image"] = og_image_url
 
         if bien:
             meta.update({

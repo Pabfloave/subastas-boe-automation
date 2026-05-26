@@ -175,6 +175,67 @@ class WordPressClient:
             logger.error(f"Error actualizando post: {response.status_code}")
             response.raise_for_status()
 
+    def upload_media(
+        self,
+        local_path,
+        mime_type: str = "image/jpeg",
+        title: Optional[str] = None,
+        alt_text: Optional[str] = None,
+    ) -> Optional[Dict]:
+        """Sube un archivo a la Media Library via REST `/wp/v2/media`.
+
+        Args:
+            local_path: pathlib.Path o str con el archivo local.
+            mime_type: Content-Type del archivo.
+            title: título visible en la media library.
+            alt_text: texto alternativo de accesibilidad.
+
+        Returns:
+            Diccionario con keys `id` y `source_url` si el upload tiene éxito,
+            None en caso contrario. No lanza excepción para que los callers
+            (og_image.py) puedan caer a fallback sin romper el publish.
+        """
+        from pathlib import Path
+        local_path = Path(local_path)
+        if not local_path.exists():
+            logger.warning(f"upload_media: archivo no existe — {local_path}")
+            return None
+
+        try:
+            with open(local_path, "rb") as fh:
+                payload = fh.read()
+            headers = {
+                "Authorization": self.headers["Authorization"],
+                "Content-Disposition": f'attachment; filename="{local_path.name}"',
+                "Content-Type": mime_type,
+            }
+            response = requests.post(
+                f"{self.api_url}/media",
+                headers=headers,
+                data=payload,
+                timeout=30,
+            )
+            if response.status_code not in (200, 201):
+                logger.warning(
+                    f"upload_media falló: HTTP {response.status_code} — {response.text[:200]}"
+                )
+                return None
+
+            media = response.json()
+            media_id = media.get("id")
+            if media_id and (title or alt_text):
+                # Patch para fijar title y alt_text (campos no aceptados en upload inicial)
+                requests.post(
+                    f"{self.api_url}/media/{media_id}",
+                    headers=self.headers,
+                    json={"title": title or "", "alt_text": alt_text or ""},
+                    timeout=15,
+                )
+            return {"id": media_id, "source_url": media.get("source_url", "")}
+        except Exception as exc:
+            logger.warning(f"upload_media excepción: {exc}")
+            return None
+
     @staticmethod
     def make_subasta_slug(id_subasta: str) -> str:
         """
