@@ -924,7 +924,23 @@ class WordPressPublisher:
         # FAQ Section (HTML visible + mejora SEO)
         html += self._generate_faq_html(subasta)
 
-        # CTA - Llamada a la acción
+        # CTA - Llamada a la acción.
+        # Construimos el href preservando el fragment (#analisis) DESPUÉS del query string;
+        # si concatenas "{contact_url}?subasta=..." cuando contact_url ya contiene "#",
+        # el navegador trata todo el query como parte del hash y no llega al servidor.
+        _cta_parts = urllib.parse.urlsplit(self.contact_url)
+        cta_href = urllib.parse.urlunsplit((
+            _cta_parts.scheme,
+            _cta_parts.netloc,
+            _cta_parts.path,
+            urllib.parse.urlencode({
+                "subasta": subasta.id_subasta,
+                "tipo": tipo_bien,
+                "localidad": localidad,
+                "provincia": provincia,
+            }),
+            _cta_parts.fragment,
+        ))
         html += f"""
     <!-- CTA - Optimizado para conversión -->
     <div class="subasta-cta">
@@ -938,7 +954,7 @@ class WordPressPublisher:
             <li>Gestión post-adjudicación y escrituración</li>
         </ul>
         <p><strong>Primera consulta gratuita</strong> - Te explicamos si esta subasta es una buena oportunidad.</p>
-        <a href="{self.contact_url}?subasta={urllib.parse.quote(subasta.id_subasta)}&tipo={urllib.parse.quote(tipo_bien)}&localidad={urllib.parse.quote(localidad)}&provincia={urllib.parse.quote(provincia)}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
+        <a href="{cta_href}" class="btn-cta" title="Solicitar análisis gratuito de subasta en {localidad}">
             Solicitar Análisis Gratuito
         </a>
     </div>
