@@ -8,6 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from .client import WordPressClient
+from ._html_utils import minify_inline_styles
 from ..models.subasta import Subasta, Bien
 
 import sys
@@ -32,6 +33,9 @@ class WordPressPublisher:
         """
         self.client = client or WordPressClient()
         self.contact_url = settings.WP_CONTACT_FORM_URL
+        # URLs publicadas/actualizadas en esta sesión — se notifican a
+        # IndexNow al hacer flush_indexnow() (Sprint 3 — Acción 6).
+        self._published_urls: List[str] = []
 
     def publish_subasta(self, subasta: Subasta, update_if_exists: bool = True) -> int:
         """
@@ -84,6 +88,8 @@ class WordPressPublisher:
             post_id = existing_post["id"]
             self.client.update_post(post_id, post_data)
             logger.info(f"Post actualizado: {post_id} - {subasta.id_subasta}")
+            if existing_post.get("link"):
+                self._published_urls.append(existing_post["link"])
             return post_id
         else:
             # Posts nuevos: slug determinista para que get_post_by_subasta_id
@@ -92,7 +98,28 @@ class WordPressPublisher:
             result = self.client.create_post(**post_data)
             post_id = result["id"]
             logger.info(f"Post creado: {post_id} - {subasta.id_subasta}")
+            if result.get("link"):
+                self._published_urls.append(result["link"])
             return post_id
+
+    def flush_indexnow(self) -> bool:
+        """Notifica a IndexNow (Bing/Yandex) las URLs publicadas en la sesión.
+
+        Llamar al final del sync. Vacía el buffer interno tras el envío.
+        Errores se loguean pero no se propagan.
+        """
+        if not self._published_urls:
+            return False
+        try:
+            from .indexnow import notify
+            from urllib.parse import urlparse
+            host = urlparse(settings.WP_URL).netloc or "comprarensubasta.com"
+            ok = notify(self._published_urls, self.client, host=host)
+        except Exception as exc:
+            logger.warning(f"flush_indexnow: {exc}")
+            ok = False
+        self._published_urls = []
+        return ok
 
     def _find_existing_post(self, id_subasta: str) -> Optional[dict]:
         """Busca un post existente para una subasta."""
@@ -969,7 +996,7 @@ class WordPressPublisher:
 
 </div>
 """
-        return html
+        return minify_inline_styles(html)
 
     def _get_categories(self, subasta: Subasta) -> List[int]:
         """Obtiene o crea las categorías para la subasta."""

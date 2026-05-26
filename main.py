@@ -217,6 +217,14 @@ def run_sync(
         if db:
             db.close()
 
+    # Notificar a IndexNow (Bing/Yandex) las URLs publicadas en este sync.
+    # No bloquea ni rompe si falla (Sprint 3 — Acción 6).
+    if wp_publisher and not dry_run:
+        try:
+            wp_publisher.flush_indexnow()
+        except Exception as exc:
+            logger.warning(f"IndexNow flush falló (no crítico): {exc}")
+
     # Resumen final
     logger.info("\n" + "=" * 60)
     logger.info("RESUMEN DE SINCRONIZACIÓN")

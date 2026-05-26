@@ -15,6 +15,9 @@ from config.provinces import PROVINCIAS_ESPANA
 _CATEGORIA_CACHE = {}
 
 
+from ._html_utils import fonts_links as _fonts_links, minify_inline_styles as _minify_inline_styles
+
+
 def _build_seo_title(base: str, suffix: str = "", max_len: int = 60) -> str:
     """Concatena `base+suffix` si cabe en `max_len`; si no, devuelve `base`
     (también truncado si fuera necesario con elipsis). Garantiza que el title
@@ -34,6 +37,124 @@ class ProvinciaPageGenerator:
     def __init__(self):
         self.base_url = settings.WP_URL
         self.auth = (settings.WP_USER, settings.WP_APP_PASSWORD)
+        # Cache de posts SSR por slug — evita re-fetchear al regenerar
+        # múltiples provincias en la misma sesión.
+        self._ssr_cache: dict = {}
+
+    # ---------- SSR de cards (Sprint 3 — Acción 2) ----------
+
+    def _fetch_posts_ssr(self, slug: str, limit: int = 20) -> tuple:
+        """Devuelve `(posts, total)` para SSR de la primera página de cards.
+
+        Crawlers (Bing, DDG, Yandex) ven el HTML estático ya pintado en vez
+        de un loading spinner. Googlebot tampoco depende del two-wave
+        indexing para descubrir los posts. Si la llamada falla (network,
+        plugin caído), devuelve `([], 0)` y el JS hidratará todo en cliente
+        como antes — degradación gradual.
+        """
+        if slug in self._ssr_cache:
+            return self._ssr_cache[slug]
+
+        try:
+            cat = requests.get(
+                f"{self.base_url}/wp-json/wp/v2/categories",
+                params={"slug": slug},
+                timeout=10,
+            ).json()
+            if not cat:
+                self._ssr_cache[slug] = ([], 0)
+                return [], 0
+            cat_id = cat[0]["id"]
+            response = requests.get(
+                f"{self.base_url}/wp-json/wp/v2/posts",
+                params={
+                    "categories": cat_id,
+                    "per_page": limit,
+                    "_fields": "id,link,title,subasta_meta",
+                },
+                timeout=15,
+            )
+            posts = response.json() or []
+            total = int(response.headers.get("X-WP-Total", "0") or "0")
+        except Exception:
+            self._ssr_cache[slug] = ([], 0)
+            return [], 0
+
+        self._ssr_cache[slug] = (posts, total)
+        return posts, total
+
+    @staticmethod
+    def _render_card_ssr(post: dict) -> str:
+        """Renderiza una card de subasta como HTML estático (compatible con
+        el output del `renderCard()` JS para que la hidratación no haga doble
+        paint).
+        """
+        meta = post.get("subasta_meta") or {}
+        titulo = (post.get("title") or {}).get("rendered", "Subasta")
+        link = post.get("link", "#")
+        ref = meta.get("_subasta_id", "")
+        estado = meta.get("_subasta_estado", "En curso") or "En curso"
+        valor = meta.get("_subasta_valor", "") or ""
+        deposito = meta.get("_subasta_deposito", "") or ""
+        fecha_fin = meta.get("_subasta_fecha_fin", "") or ""
+        tipo = meta.get("_bien_tipo", "Inmueble") or "Inmueble"
+        localidad = meta.get("_bien_localidad", "") or ""
+        num_lotes = (meta.get("_subasta_num_lotes") or "1")
+
+        def fmt_money(v: str) -> str:
+            try:
+                n = float(v)
+                if n <= 0:
+                    return "No disponible"
+                return f"{n:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+            except (TypeError, ValueError):
+                return "No disponible"
+
+        def fmt_date(v: str) -> str:
+            if not v:
+                return "No disponible"
+            # ISO 8601 → "DD/MM/YYYY HH:MM"
+            try:
+                from datetime import datetime as _dt
+                d = _dt.fromisoformat(v.replace("Z", ""))
+                return d.strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                return v
+
+        try:
+            n_lotes = int(num_lotes)
+        except (TypeError, ValueError):
+            n_lotes = 1
+        lotes_badge = (
+            f'<span class="badge badge-lotes">📦 {n_lotes} Lotes</span>'
+            if n_lotes > 1 else ""
+        )
+        badge_class = "badge-success" if "celebr" in estado.lower() else "badge-info"
+        badge_text = "En Curso" if "celebr" in estado.lower() else estado
+
+        return (
+            f'<article class="subasta-card{"" if n_lotes <= 1 else " multi-lotes"}">'
+            f'<header class="subasta-header">'
+            f'<div><h2 class="subasta-title"><a href="{link}">{titulo}</a></h2>'
+            f'<span class="subasta-ref">Ref: {ref}</span></div>'
+            f'<div class="badges-container">{lotes_badge}'
+            f'<span class="badge {badge_class}">{badge_text}</span></div>'
+            f'</header>'
+            f'<div class="subasta-info-grid">'
+            f'<div class="info-item"><div class="info-label">💰 Valor Subasta</div>'
+            f'<div class="info-value precio-destacado">{fmt_money(valor)}</div></div>'
+            f'<div class="info-item"><div class="info-label">🏷️ Depósito</div>'
+            f'<div class="info-value">{fmt_money(deposito)}</div></div>'
+            f'<div class="info-item"><div class="info-label">📅 Finaliza</div>'
+            f'<div class="info-value">{fmt_date(fecha_fin)}</div></div>'
+            f'<div class="info-item"><div class="info-label">🏠 Tipo</div>'
+            f'<div class="info-value">{tipo}</div></div>'
+            f'<div class="info-item"><div class="info-label">📍 Localidad</div>'
+            f'<div class="info-value">{localidad}</div></div>'
+            f'</div>'
+            f'<a href="{link}" class="btn-ver-subasta">Ver Detalles Completos →</a>'
+            f'</article>'
+        )
 
     def _get_or_create_category(self, nombre: str, slug: str) -> int:
         """Obtiene o crea una categoría de provincia."""
@@ -240,6 +361,12 @@ class ProvinciaPageGenerator:
         faq_html, faq_schema = self._generate_faq_section(nombre, comunidad)
         seo_text = self._generate_province_seo_text(nombre, comunidad)
 
+        # SSR de las primeras 20 cards (Sprint 3 — Acción 2). Si falla,
+        # ssr_posts será [] y el JS hidratará todo en cliente como antes.
+        ssr_posts, ssr_total = self._fetch_posts_ssr(slug, limit=20)
+        ssr_cards_html = "".join(self._render_card_ssr(p) for p in ssr_posts)
+        ssr_count = len(ssr_posts)
+
         # Combine all schemas
         schemas_json = (
             f'<script type="application/ld+json">\n{json.dumps(breadcrumb_schema, ensure_ascii=False, indent=2)}\n</script>\n'
@@ -247,7 +374,7 @@ class ProvinciaPageGenerator:
             f'<script type="application/ld+json">\n{json.dumps(faq_schema, ensure_ascii=False, indent=2)}\n</script>'
         )
 
-        return f'''<!-- wp:html -->
+        html = f'''<!-- wp:html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -278,9 +405,7 @@ class ProvinciaPageGenerator:
   <!-- Structured Data -->
   {schemas_json}
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+{_fonts_links("family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display")}
   <style>
     :root {{
       --color-primary: #0f172a;
@@ -883,13 +1008,16 @@ class ProvinciaPageGenerator:
     </div>
   </section>
 
-  <!-- ===== SUBASTAS CONTAINER ===== -->
-  <div id="subastas-container">
-    <div class="loading">
-      <div class="loading-spinner"></div>
-      <p>Cargando subastas de {nombre}...</p>
-    </div>
+  <!-- ===== SUBASTAS CONTAINER (SSR + JS hydrate — Sprint 3 A2) ===== -->
+  <div id="subastas-container" class="subastas-grid" data-ssr-count="{ssr_count}" data-ssr-total="{ssr_total}">
+    {ssr_cards_html}
   </div>
+  <noscript>
+    <p style="text-align:center;padding:30px;color:#475569;">
+      Mostrando las {ssr_count} subastas más recientes en {nombre}.
+      Activa JavaScript para ver el listado completo y la paginación.
+    </p>
+  </noscript>
 
   <!-- ===== SEO CONTENT (STATIC, INDEXABLE) ===== -->
   {seo_text}
@@ -1015,6 +1143,13 @@ class ProvinciaPageGenerator:
 
       const categoriaId = categories[0].id;
       const container = document.getElementById('subastas-container');
+      const ssrCount = parseInt(container.dataset.ssrCount || '0', 10);
+      const ssrTotal = parseInt(container.dataset.ssrTotal || '0', 10);
+
+      // Si el SSR ya pintó el total mostramos su valor en seguida (mejor UX)
+      if (ssrTotal > 0) {{
+        document.getElementById('stats-total').textContent = ssrTotal;
+      }}
 
       // Primera página: renderizar inmediatamente
       const firstResponse = await fetch(`${{API_URL}}/posts?categories=${{categoriaId}}&per_page=100&page=1&_embed`);
@@ -1024,28 +1159,37 @@ class ProvinciaPageGenerator:
 
       if (firstBatch.length === 0) {{
         document.getElementById('stats-total').textContent = '0';
-        container.innerHTML = `
-          <div style="text-align: center; padding: 60px 20px;">
-            <p style="font-size: 1.2em; color: var(--color-text-muted);">
-              No hay subastas activas en ${{PROVINCIA}} en este momento.
-            </p>
-            <p style="margin-top: 15px;">Vuelva a consultar pronto o explore otras provincias.</p>
-          </div>
-        `;
+        // Solo pintamos empty state si SSR tampoco trajo nada (no destruir SSR).
+        if (ssrCount === 0) {{
+          container.replaceChildren();
+          const empty = document.createElement('div');
+          empty.style.cssText = 'text-align:center;padding:60px 20px;';
+          empty.appendChild(Object.assign(document.createElement('p'),
+            {{textContent: `No hay subastas activas en ${{PROVINCIA}} en este momento.`,
+              style: 'font-size:1.2em;color:var(--color-text-muted);'}}));
+          empty.appendChild(Object.assign(document.createElement('p'),
+            {{textContent: 'Vuelva a consultar pronto o explore otras provincias.',
+              style: 'margin-top:15px;'}}));
+          container.appendChild(empty);
+        }}
         return;
       }}
 
-      // Mostrar total y primera página de resultados sin esperar al resto
+      // Refrescar total con el valor canónico de la API
       document.getElementById('stats-total').textContent = totalPosts;
-      container.innerHTML = '<div class="subastas-grid" id="subastas-grid"></div>';
-      const grid = document.getElementById('subastas-grid');
-      grid.innerHTML = firstBatch.map(renderCard).join('');
+
+      // Sprint 3 A2: si el servidor ya pintó las primeras N cards, saltarlas
+      // para no duplicar el render. El contenedor YA es .subastas-grid.
+      const toRender = ssrCount > 0 ? firstBatch.slice(ssrCount) : firstBatch;
+      if (toRender.length > 0) {{
+        container.insertAdjacentHTML('beforeend', toRender.map(renderCard).join(''));
+      }}
 
       // Cargar páginas restantes en segundo plano
       for (let page = 2; page <= totalPages; page++) {{
         const resp = await fetch(`${{API_URL}}/posts?categories=${{categoriaId}}&per_page=100&page=${{page}}&_embed`);
         const batch = await resp.json();
-        grid.insertAdjacentHTML('beforeend', batch.map(renderCard).join(''));
+        container.insertAdjacentHTML('beforeend', batch.map(renderCard).join(''));
       }}
 
     }} catch (error) {{
@@ -1069,6 +1213,7 @@ class ProvinciaPageGenerator:
 </body>
 </html>
 <!-- /wp:html -->'''
+        return _minify_inline_styles(html)
 
     def _set_seo_meta(self, page_id: int, provincia_codigo: str):
         """Sets Rank Math and Yoast SEO meta fields for a province page."""
@@ -1260,7 +1405,7 @@ class ProvinciaPageGenerator:
             "inLanguage": "es"
         }
 
-        return f'''<!-- wp:html -->
+        html = f'''<!-- wp:html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1292,9 +1437,7 @@ class ProvinciaPageGenerator:
 {json.dumps(index_webpage, ensure_ascii=False, indent=2)}
   </script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+{_fonts_links("family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display")}
   <style>
     :root {{
       --color-primary: #0f172a;
@@ -1613,6 +1756,7 @@ class ProvinciaPageGenerator:
 </body>
 </html>
 <!-- /wp:html -->'''
+        return _minify_inline_styles(html)
 
     def _set_index_seo_meta(self, page_id: int):
         """Sets SEO meta fields for the index page."""
