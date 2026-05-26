@@ -59,6 +59,19 @@ class MockClient:
     def unpublish_post(self, post_id: int) -> bool:
         return True
 
+    def upload_media(self, local_path, mime_type: str = "image/jpeg",
+                     title: Optional[str] = None, alt_text: Optional[str] = None) -> Optional[dict]:
+        """Mock: simula upload exitoso devolviendo URL plausible."""
+        from pathlib import Path
+        p = Path(local_path)
+        # Si el archivo no existe, simulamos fallo (igual que el cliente real).
+        if not p.exists():
+            return None
+        return {
+            "id": 1000 + len([p for p in [self]]),  # ID distinto por instancia
+            "source_url": f"http://localhost:8080/wp-content/uploads/{p.name}",
+        }
+
 
 @pytest.fixture
 def mock_client() -> MockClient:

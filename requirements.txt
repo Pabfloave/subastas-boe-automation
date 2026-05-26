@@ -21,6 +21,9 @@ click>=8.1.0
 # Dates
 python-dateutil>=2.8.0
 
+# Imágenes Open Graph dinámicas (Sprint 2 — decisión D1)
+Pillow>=10.0.0
+
 # Nota: SQLite viene incluido con Python
 
 # Opcionales para desarrollo
