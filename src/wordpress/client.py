@@ -332,11 +332,26 @@ class WordPressClient:
             ID de la categoría
         """
         # Verificar cache
-        cache_key = f"{name}_{parent}"
+        cache_key = f"{slug or name}_{parent}"
         if cache_key in self._categories_cache:
             return self._categories_cache[cache_key]
 
-        # Buscar categoría existente
+        # Buscar primero por slug: es único en WordPress. Buscar solo por
+        # nombre hacía que "Valencia/València" no encontrase "Valencia" y se
+        # creara una categoría duplicada con slug "valencia-subastas".
+        if slug:
+            response = requests.get(
+                f"{self.api_url}/categories",
+                headers=self.headers,
+                params={"slug": slug},
+                timeout=15
+            )
+            if response.status_code == 200 and response.json():
+                cat_id = response.json()[0]["id"]
+                self._categories_cache[cache_key] = cat_id
+                return cat_id
+
+        # Buscar categoría existente por nombre
         params = {"search": name, "per_page": 100}
         if parent:
             params["parent"] = parent
