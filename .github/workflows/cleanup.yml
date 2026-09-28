@@ -104,6 +104,14 @@ jobs:
           python cli.py cleanup $DRY_RUN_FLAG
         timeout-minutes: 45
 
+      # Las páginas provinciales llevan pre-renderizadas (SSR) las últimas
+      # fichas y el recuento de subastas: se regeneran tras cada limpieza para
+      # que buscadores y motores de IA no vean fichas ya finalizadas.
+      - name: Regenerar páginas provinciales
+        if: github.event.inputs.dry_run != 'true'
+        run: python cli.py paginas
+        timeout-minutes: 20
+
       - name: Guardar BD en cache
         if: always()
         uses: actions/cache/save@v4

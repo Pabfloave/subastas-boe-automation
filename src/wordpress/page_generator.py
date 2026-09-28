@@ -8,8 +8,10 @@ import json
 import requests
 from datetime import datetime
 from typing import Dict, Optional
+import urllib.parse
 from config import settings
 from config.provinces import PROVINCIAS_ESPANA
+from . import legal_texts
 
 # Cache de IDs de categorías (se llena dinámicamente)
 _CATEGORIA_CACHE = {}
@@ -29,6 +31,53 @@ def _build_seo_title(base: str, suffix: str = "", max_len: int = 60) -> str:
     if len(base) <= max_len:
         return base
     return base[: max_len - 1] + "…"
+
+
+def _province_meta_description(nombre: str, comunidad: str, year: int) -> str:
+    """Meta description de la página provincial (fuente única para el HTML y
+    para Rank Math). Promete lo que realmente se ofrece: análisis de cargas."""
+    desc = (
+        f"Subastas judiciales en {nombre} {year}: pisos, casas, locales y fincas del BOE "
+        f"en {nombre} ({comunidad}), actualizadas cada 24 h. Análisis jurídico de cargas antes de pujar."
+    )
+    if len(desc) > 160:
+        desc = (
+            f"Subastas judiciales en {nombre} {year}: inmuebles del BOE actualizados cada 24 h. "
+            "Análisis jurídico de cargas antes de pujar."
+        )
+    return desc if len(desc) <= 160 else desc[:157] + "..."
+
+
+def _form_url(**params: str) -> str:
+    """URL del formulario de contacto (settings.WP_CONTACT_FORM_URL) con
+    parámetros; el query va antes del #fragment para que llegue al servidor.
+    Sustituye al antiguo /contacto/, que no registraba la provincia."""
+    parts = urllib.parse.urlsplit(settings.WP_CONTACT_FORM_URL)
+    return urllib.parse.urlunsplit((
+        parts.scheme, parts.netloc, parts.path,
+        urllib.parse.urlencode(params), parts.fragment,
+    ))
+
+
+def _oferta_html() -> str:
+    if not settings.INFORME_PRECIO:
+        return ""
+    plazo = f", entregado en un máximo de {settings.INFORME_PLAZO}" if settings.INFORME_PLAZO else ""
+    return (
+        f'<p style="font-size:0.95em;opacity:0.9;">Informe jurídico previo de la subasta que elija: '
+        f"<strong>{settings.INFORME_PRECIO}</strong>{plazo}.</p>"
+    )
+
+
+def _autor_html() -> str:
+    responsable = legal_texts.responsable_juridico()
+    if not responsable:
+        return ""
+    return (
+        '<p style="font-size:0.9em;color:#475569;margin-top:30px;border-top:1px solid #e5e7eb;padding-top:16px;">'
+        f"Contenido jurídico de CAFAVE Investment. Abogado responsable: {responsable}. "
+        f"Normativa revisada conforme a la {legal_texts.REFORMA_NORMA} (en vigor desde el {legal_texts.REFORMA_VIGOR}).</p>"
+    )
 
 
 class ProvinciaPageGenerator:
@@ -223,9 +272,9 @@ class ProvinciaPageGenerator:
     <ol>
       <li><strong>Identifique la subasta</strong> \u2013 Consulte nuestro listado actualizado de subastas activas en {nombre}.</li>
       <li><strong>Analice la documentaci\u00f3n</strong> \u2013 Revise el edicto, las cargas registrales y la situaci\u00f3n posesoria. <em>Le recomendamos asesoramiento profesional.</em></li>
-      <li><strong>Deposite la garant\u00eda</strong> \u2013 Ingrese el 20% del valor de tasaci\u00f3n en el Portal de Subastas del BOE.</li>
+      <li><strong>Deposite la garant\u00eda</strong> \u2013 Consigne en el Portal de Subastas del BOE el dep\u00f3sito indicado en el anuncio: {legal_texts.DEPOSITO_RESUMEN}</li>
       <li><strong>Realice su puja</strong> \u2013 Las subastas electr\u00f3nicas est\u00e1n abiertas durante 20 d\u00edas naturales.</li>
-      <li><strong>Adjudicaci\u00f3n</strong> \u2013 Si resulta adjudicatario, complete el pago y proceda a la escrituraci\u00f3n.</li>
+      <li><strong>Adjudicaci\u00f3n</strong> \u2013 Si resulta mejor postor, consigne el resto del precio en plazo (20 d\u00edas tras la LO 1/2025; 40 en procedimientos anteriores) y, dictado el decreto de adjudicaci\u00f3n, inscriba la adquisici\u00f3n en el Registro de la Propiedad.</li>
     </ol>
   </section>"""
 
@@ -235,11 +284,11 @@ class ProvinciaPageGenerator:
         faqs = [
             {
                 "q": f"\u00bfC\u00f3mo puedo comprar un piso en subasta judicial en {nombre}?",
-                "a": f"Para comprar un piso en subasta judicial en {nombre}, debe registrarse en el Portal de Subastas del BOE (subastas.boe.es), depositar el 20% del valor de tasaci\u00f3n como garant\u00eda, y realizar su puja online durante los 20 d\u00edas que dura la subasta electr\u00f3nica. Le recomendamos contar con asesoramiento legal para analizar cargas y viabilidad."
+                "a": f"Para comprar un piso en subasta judicial en {nombre}, debe darse de alta en el Portal de Subastas del BOE (subastas.boe.es), consignar el dep\u00f3sito que indique el anuncio ({legal_texts.DEPOSITO_RESUMEN}) y pujar por internet mientras la subasta est\u00e9 abierta: 20 d\u00edas naturales desde su apertura. Le recomendamos contar con asesoramiento legal para analizar cargas y viabilidad."
             },
             {
                 "q": f"\u00bfQu\u00e9 dep\u00f3sito necesito para participar en subastas en {nombre}?",
-                "a": f"Desde la entrada en vigor de la nueva regulaci\u00f3n, el dep\u00f3sito para participar en subastas judiciales de inmuebles en {nombre} es del 20% del valor de tasaci\u00f3n, con un m\u00ednimo de 1.000\u20ac. Este dep\u00f3sito se realiza electr\u00f3nicamente a trav\u00e9s de la pasarela de pagos de la Agencia Tributaria."
+                "a": legal_texts.DEPOSITO_JUDICIAL + " El dep\u00f3sito se constituye electr\u00f3nicamente en el propio Portal de Subastas."
             },
             {
                 "q": f"\u00bfEs seguro comprar en subasta judicial en {nombre}?",
@@ -306,13 +355,7 @@ class ProvinciaPageGenerator:
         page_url = f"https://comprarensubasta.com/subastas-judiciales-{slug}/"
         site_url = "https://comprarensubasta.com"
 
-        meta_description = (
-            f"Subastas judiciales en {nombre} {current_year}. "
-            f"Listado actualizado de pisos, casas, locales y fincas embargadas en {nombre} ({comunidad}). "
-            f"Descuentos del 30-60%. Asesoramiento legal gratuito."
-        )
-        if len(meta_description) > 160:
-            meta_description = meta_description[:157] + "..."
+        meta_description = _province_meta_description(nombre, comunidad, current_year)
 
         meta_title = _build_seo_title(
             base=f"Subastas Judiciales en {nombre} {current_year}",
@@ -356,6 +399,9 @@ class ProvinciaPageGenerator:
             "inLanguage": "es",
             "dateModified": datetime.now().strftime("%Y-%m-%d")
         }
+        autor = legal_texts.autor_schema()
+        if autor:
+            webpage_schema["provider"]["employee"] = autor
 
         # Generate FAQ section and schema
         faq_html, faq_schema = self._generate_faq_section(nombre, comunidad)
@@ -366,6 +412,13 @@ class ProvinciaPageGenerator:
         ssr_posts, ssr_total = self._fetch_posts_ssr(slug, limit=20)
         ssr_cards_html = "".join(self._render_card_ssr(p) for p in ssr_posts)
         ssr_count = len(ssr_posts)
+        # Dato fechado y verificable: es lo que citan los buscadores con IA
+        # ("¿cuántas subastas hay en X?"). La página se regenera a diario.
+        dato_actual_html = (
+            f'<p><strong>A {datetime.now().strftime("%d/%m/%Y")}, nuestro listado recoge {ssr_total} '
+            f'subastas de inmuebles en {nombre}</strong> procedentes del Portal de Subastas del BOE.</p>'
+            if ssr_total else ""
+        )
 
         # Combine all schemas
         schemas_json = (
@@ -991,15 +1044,16 @@ class ProvinciaPageGenerator:
   <section class="intro-section">
     <h1>Subastas Judiciales en {nombre} {current_year}</h1>
     <p>Listado completo y actualizado de <strong>subastas judiciales de inmuebles en {nombre}</strong> ({comunidad}) publicadas en el BOE. Pisos, casas, locales y fincas embargadas con descuentos de hasta el 60%. Asesoramiento legal de CAFAVE INVESTMENT.</p>
+    {dato_actual_html}
 
     <div class="stats-grid">
       <div class="stat-box">
-        <span class="stat-number" id="stats-total">-</span>
+        <span class="stat-number" id="stats-total">{ssr_total if ssr_total else "-"}</span>
         <span class="stat-label">Subastas Activas</span>
       </div>
       <div class="stat-box">
         <span class="stat-number">20%</span>
-        <span class="stat-label">Depósito Nuevo Régimen</span>
+        <span class="stat-label">Depósito tras la LO 1/2025</span>
       </div>
       <div class="stat-box">
         <span class="stat-number">24h</span>
@@ -1029,8 +1083,11 @@ class ProvinciaPageGenerator:
   <section class="cta-section">
     <h2>Asesoramiento Profesional en Subastas Judiciales en {nombre}</h2>
     <p>Nuestro equipo de abogados especializados en {comunidad} analiza cada subasta, verifica cargas registrales y le acompa\u00f1a en todo el proceso de compra en subasta judicial.</p>
-    <a href="/contacto/" class="cta-btn" title="Solicitar consulta gratuita subastas {nombre}">Solicitar Consulta Gratuita</a>
+    {_oferta_html()}
+    <a href="{_form_url(provincia=nombre)}" class="cta-btn" title="Solicitar análisis de una subasta en {nombre}">Solicitar Análisis de una Subasta</a>
   </section>
+
+  {_autor_html()}
 
 </div>
 
@@ -1178,12 +1235,11 @@ class ProvinciaPageGenerator:
       // Refrescar total con el valor canónico de la API
       document.getElementById('stats-total').textContent = totalPosts;
 
-      // Sprint 3 A2: si el servidor ya pintó las primeras N cards, saltarlas
-      // para no duplicar el render. El contenedor YA es .subastas-grid.
-      const toRender = ssrCount > 0 ? firstBatch.slice(ssrCount) : firstBatch;
-      if (toRender.length > 0) {{
-        container.insertAdjacentHTML('beforeend', toRender.map(renderCard).join(''));
-      }}
+      // Las cards SSR son una instantánea del momento en que se generó la
+      // página (sirven a buscadores sin JS). Con datos frescos de la API se
+      // sustituyen enteras: suponer que coinciden con los primeros N posts
+      // dejaba visibles fichas ya finalizadas y ocultaba las nuevas.
+      container.innerHTML = firstBatch.map(renderCard).join('');
 
       // Cargar páginas restantes en segundo plano
       for (let page = 2; page <= totalPages; page++) {{
@@ -1228,13 +1284,7 @@ class ProvinciaPageGenerator:
             base=f"Subastas Judiciales en {nombre} {current_year}",
             suffix=" | Inmuebles BOE",
         )
-        meta_desc = (
-            f"Subastas judiciales en {nombre} {current_year}. "
-            f"Listado actualizado de pisos, casas, locales y fincas embargadas en {nombre} ({comunidad}). "
-            f"Descuentos del 30-60%. Asesoramiento legal gratuito."
-        )
-        if len(meta_desc) > 160:
-            meta_desc = meta_desc[:157] + "..."
+        meta_desc = _province_meta_description(nombre, comunidad, current_year)
         focus_kw = f"subastas judiciales {nombre.lower()}"
 
         meta_fields = {
@@ -1265,7 +1315,7 @@ class ProvinciaPageGenerator:
 
         current_year = datetime.now().year
         slug = f"subastas-judiciales-{prov['slug']}"
-        title = f"Subastas Judiciales en {prov['nombre']} {current_year} | Inmuebles BOE Actualizado"
+        title = f"Subastas Judiciales en {prov['nombre']} {current_year}"
         content = self.generate_page_content(provincia_codigo)
 
         # Verificar si ya existe
@@ -1730,8 +1780,8 @@ class ProvinciaPageGenerator:
 
     <div class="info-grid">
       <div class="info-card">
-        <h3>Depósito del 20%</h3>
-        <p>Para participar necesita depositar el 20% del valor de tasación como garantía.</p>
+        <h3>Depósito para pujar</h3>
+        <p>En subastas judiciales de inmuebles: {legal_texts.DEPOSITO_RESUMEN} El importe exacto figura en cada anuncio.</p>
       </div>
       <div class="info-card">
         <h3>Proceso 100% Online</h3>
@@ -1748,8 +1798,11 @@ class ProvinciaPageGenerator:
   <section class="cta-section">
     <h2>¿Necesita Ayuda Profesional?</h2>
     <p>Nuestro equipo de expertos puede analizar las oportunidades y gestionar todo el proceso de compra.</p>
-    <a href="/contacto/" class="cta-btn">Solicitar Consulta Gratuita</a>
+    {_oferta_html()}
+    <a href="{_form_url()}" class="cta-btn">Solicitar Análisis de una Subasta</a>
   </section>
+
+  {_autor_html()}
 
 </div>
 
@@ -1795,7 +1848,7 @@ class ProvinciaPageGenerator:
         """
         current_year = datetime.now().year
         slug = "subastas-judiciales"
-        title = f"Subastas Judiciales en España {current_year} | Todas las Provincias"
+        title = f"Subastas Judiciales en España {current_year}"
         content = self.generate_index_page_content()
 
         # Verificar si ya existe

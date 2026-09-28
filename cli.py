@@ -538,6 +538,43 @@ def social_batch(limit, output_dir):
         click.secho(f"❌ Error: {e}", fg='red')
 
 
+@cli.command('paginas')
+@click.option('--provincia', '-p', 'provincias', multiple=True,
+              help='Código INE de provincia (repetible). Por defecto, todas + índice.')
+def paginas(provincias):
+    """
+    Regenerar las páginas provinciales (y el índice) en WordPress.
+
+    Mantiene al día las fichas pre-renderizadas (SSR) que ven los buscadores,
+    el recuento de subastas y los textos. Se ejecuta a diario tras la limpieza.
+
+    Ejemplos:
+        python cli.py paginas
+        python cli.py paginas -p 41 -p 29
+    """
+    from src.wordpress.page_generator import ProvinciaPageGenerator
+
+    generator = ProvinciaPageGenerator()
+    codigos = list(provincias) or sorted(PROVINCIAS_ESPANA.keys())
+    errores = 0
+    for codigo in codigos:
+        try:
+            r = generator.create_page(codigo)
+            click.echo(f"  {r['action'].upper()}: {r['provincia']} (ID {r['id']})")
+        except Exception as e:
+            errores += 1
+            click.secho(f"  ERROR {codigo}: {e}", fg='red')
+    if not provincias:
+        try:
+            r = generator.create_index_page()
+            click.echo(f"  {r['action'].upper()}: índice (ID {r['id']})")
+        except Exception as e:
+            errores += 1
+            click.secho(f"  ERROR índice: {e}", fg='red')
+    if errores:
+        raise SystemExit(1)
+
+
 @cli.command('fix-categories')
 @click.option('--dry-run', is_flag=True, help='Solo mostrar cambios sin aplicar')
 @click.option('--update-db', is_flag=True, help='Actualizar provincia_codigo en BD')
@@ -620,9 +657,44 @@ def fix_categories(dry_run, update_db, update_pages):
         all_cats.extend(batch)
         page += 1
 
+    # Categorías canónicas ya existentes (slug correcto) → id
+    canonicas = {}
+    for cat in all_cats:
+        match = match_provincia(cat["name"])
+        if match and cat["slug"] == match[1]:
+            canonicas[match[1]] = cat["id"]
+
+    def mover_posts(origen_id, destino_id):
+        """Reasigna todos los posts de una categoría duplicada a la canónica."""
+        movidos = 0
+        vistos = set()
+        while True:
+            resp = requests.get(f"{api_url}/posts", auth=auth, params={
+                "categories": origen_id, "per_page": 100, "status": "any",
+                "_fields": "id,categories",
+            }, timeout=30)
+            batch = resp.json() if resp.status_code == 200 else []
+            batch = [p for p in batch if p["id"] not in vistos]
+            if not batch:
+                return movidos
+            for post in batch:
+                vistos.add(post["id"])
+                nuevas = sorted((set(post["categories"]) - {origen_id}) | {destino_id})
+                r = requests.post(f"{api_url}/posts/{post['id']}", auth=auth,
+                                  json={"categories": nuevas}, timeout=30)
+                if r.status_code != 200:
+                    click.secho(f"     ❌ Post {post['id']}: HTTP {r.status_code}", fg='red')
+                    return movidos
+                movidos += 1
+
     fixed = 0
     skipped = 0
+    merged = 0
     for cat in all_cats:
+        if cat["slug"] == "desconocida":
+            click.echo(f"  ⚠️  Categoría 'desconocida' ({cat['name']}): {cat.get('count', 0)} posts — "
+                       "revisar a mano o re-publicar con --force para reasignarlos")
+            continue
         match = match_provincia(cat["name"])
         if not match:
             click.echo(f"  ⚠️  No se pudo mapear: {cat['name']} (slug: {cat['slug']})")
@@ -631,6 +703,17 @@ def fix_categories(dry_run, update_db, update_pages):
         codigo, slug_correcto = match
         if cat["slug"] == slug_correcto:
             skipped += 1
+            continue
+
+        # Ya existe la categoría canónica: renombrar el slug fallaría, así que
+        # se fusiona (las fichas pasan a la canónica y salen en su página).
+        if slug_correcto in canonicas:
+            click.echo(f"  🔀 {cat['name']} (slug '{cat['slug']}', {cat.get('count', 0)} posts) "
+                       f"→ fusionar en '{slug_correcto}'")
+            if not dry_run:
+                n = mover_posts(cat["id"], canonicas[slug_correcto])
+                click.secho(f"     ✅ {n} posts movidos (la categoría vacía puede borrarse desde WP)", fg='green')
+            merged += 1
             continue
 
         click.echo(f"  🔧 {cat['name']}: slug '{cat['slug']}' → '{slug_correcto}'")
@@ -649,7 +732,7 @@ def fix_categories(dry_run, update_db, update_pages):
             fixed += 1
 
     prefix = "[DRY-RUN] " if dry_run else ""
-    click.echo(f"\n{prefix}Categorías: {fixed} corregidas, {skipped} ya correctas")
+    click.echo(f"\n{prefix}Categorías: {fixed} corregidas, {merged} fusionadas, {skipped} ya correctas")
 
     # ─── Paso 2: Actualizar provincia_codigo en BD ───
     if update_db:

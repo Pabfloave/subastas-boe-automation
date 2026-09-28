@@ -24,7 +24,21 @@ WP_URL = os.getenv("WP_URL", "https://comprarensubasta.com")
 WP_USER = os.getenv("WP_USER", "")
 WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
 WP_POST_STATUS = os.getenv("WP_POST_STATUS", "publish")
-WP_CONTACT_FORM_URL = os.getenv("WP_CONTACT_FORM_URL", "https://comprarensubasta.com/#analisis")
+# `or`: si el secreto de GitHub existe pero está vacío, getenv devuelve "".
+WP_CONTACT_FORM_URL = os.getenv("WP_CONTACT_FORM_URL") or "https://comprarensubasta.com/#analisis"
+
+# Responsable jurídico visible en fichas y páginas de provincia. Refuerza la
+# autoría (E-E-A-T, citas en buscadores con IA) y cubre el art. 10 LSSI para
+# profesiones reguladas (colegio y número de colegiado). Vacío = no se muestra.
+AUTOR_NOMBRE = os.getenv("AUTOR_NOMBRE", "Pablo Flores Avellaneda")
+AUTOR_COLEGIO = os.getenv("AUTOR_COLEGIO", "Ilustre Colegio de Abogados de Sevilla")
+AUTOR_COLEGIADO = os.getenv("AUTOR_COLEGIADO", "14.408")
+
+# Condiciones del informe jurídico previo, mostradas junto al CTA para que
+# coincidan con la respuesta automática que recibe el interesado.
+# Vacío = no se muestra el precio.
+INFORME_PRECIO = os.getenv("INFORME_PRECIO", "72,60 € (IVA incluido)")
+INFORME_PLAZO = os.getenv("INFORME_PLAZO", "24 horas hábiles")
 
 # Base de datos
 DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "subastas.db"))

@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Subastas Meta API
- * Description: API REST de campos meta + autor CAFAVE + fechas en español + auto-respuesta al inversor (WPForms) + BBDD de inversores con exportación a Excel/CSV.
- * Version: 1.4
+ * Description: API REST de campos meta (subastas + Rank Math) + autor CAFAVE + fechas en español + auto-respuesta al inversor (WPForms) + BBDD de inversores con exportación a Excel/CSV + redirecciones 301 de subastas finalizadas y archivos de categoría + noindex de etiquetas.
+ * Version: 1.5
  * Author: CAFAVE INVESTMENT
  */
 
@@ -11,6 +11,16 @@ if (!defined('ABSPATH')) exit;
 // Reply-To del correo automático al inversor: si el inversor responde, la respuesta va aquí.
 if (!defined('SUBASTAS_REPLY_TO')) {
     define('SUBASTAS_REPLY_TO', 'pabloflores.abogado@outlook.com');
+}
+
+// 301 de /category/subastas/{provincia}/ a /subastas-judiciales-{provincia}/.
+if (!defined('SUBASTAS_REDIRECT_CATEGORY_TO_HUB')) {
+    define('SUBASTAS_REDIRECT_CATEGORY_TO_HUB', true);
+}
+
+// 301 de fichas de subasta despublicadas (finalizadas) a su página provincial.
+if (!defined('SUBASTAS_REDIRECT_EXPIRED')) {
+    define('SUBASTAS_REDIRECT_EXPIRED', true);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -48,6 +58,71 @@ function subastas_add_meta_to_rest($response, $post, $request) {
     return $response;
 }
 add_filter('rest_prepare_post', 'subastas_add_meta_to_rest', 10, 3);
+
+// ═══════════════════════════════════════════════════════════════
+// REST API: aceptar los campos SEO de Rank Math
+// WordPress descarta EN SILENCIO cualquier clave de `meta` no registrada con
+// show_in_rest. Rank Math no registra las suyas, así que los títulos,
+// descripciones, canonical, robots e imágenes OG que envía el generador Python
+// nunca llegaban a guardarse (los títulos en Google lo confirman: salen con la
+// plantilla por defecto "%title% - %sitename%").
+// ═══════════════════════════════════════════════════════════════
+
+function subastas_rank_math_string_keys() {
+    return array(
+        'rank_math_title', 'rank_math_description', 'rank_math_focus_keyword',
+        'rank_math_canonical_url', 'rank_math_facebook_image', 'rank_math_twitter_image',
+        'rank_math_rich_snippet',
+    );
+}
+
+function subastas_rank_math_auth($allowed, $meta_key, $object_id) {
+    return current_user_can('edit_post', $object_id);
+}
+
+function subastas_register_rank_math_meta() {
+    foreach (array('post', 'page') as $post_type) {
+        foreach (subastas_rank_math_string_keys() as $meta_key) {
+            if (registered_meta_key_exists('post', $meta_key, $post_type)) continue;
+            register_post_meta($post_type, $meta_key, array(
+                'show_in_rest' => true,
+                'single' => true,
+                'type' => 'string',
+                'auth_callback' => 'subastas_rank_math_auth',
+            ));
+        }
+        if (!registered_meta_key_exists('post', 'rank_math_robots', $post_type)) {
+            register_post_meta($post_type, 'rank_math_robots', array(
+                'show_in_rest' => array(
+                    'schema' => array('type' => 'array', 'items' => array('type' => 'string')),
+                ),
+                'single' => true,
+                'type' => 'array',
+                'auth_callback' => 'subastas_rank_math_auth',
+            ));
+        }
+    }
+}
+add_action('init', 'subastas_register_rank_math_meta', 20);
+
+// ═══════════════════════════════════════════════════════════════
+// Helper: URL pública de la ficha a partir del ID BOE
+// ═══════════════════════════════════════════════════════════════
+
+function subastas_find_post_url_by_id($subasta_id) {
+    if ($subasta_id === '') return '';
+    $ids = get_posts(array(
+        'post_type' => 'post',
+        'post_status' => 'publish',
+        'meta_key' => '_subasta_id',
+        'meta_value' => $subasta_id,
+        'fields' => 'ids',
+        'numberposts' => 1,
+        'no_found_rows' => true,
+    ));
+    if (!empty($ids)) return get_permalink($ids[0]);
+    return 'https://subastas.boe.es/detalleSubasta.php?idSub=' . rawurlencode($subasta_id);
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Autor "CAFAVE INVESTMENT" en posts
@@ -100,6 +175,10 @@ function subastas_inv_table_name() {
 
 function subastas_inv_ensure_table() {
     global $wpdb;
+    // dbDelta es costoso: solo se ejecuta si cambia la versión del esquema.
+    if (get_option('subastas_inv_db_version') === '1' && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', subastas_inv_table_name()))) {
+        return;
+    }
     $table = subastas_inv_table_name();
     $charset = $wpdb->get_charset_collate();
 
@@ -124,6 +203,7 @@ function subastas_inv_ensure_table() {
 
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta($sql);
+    update_option('subastas_inv_db_version', '1', false);
 }
 register_activation_hook(__FILE__, 'subastas_inv_ensure_table');
 
@@ -167,9 +247,7 @@ function subastas_smart_tag_process($message, $form_data, $fields, $entry_id, $c
         return $message;
     }
     $ref = subastas_get_referer_params();
-    $url = ($ref['subasta_id'] !== '')
-        ? 'https://comprarensubasta.com/?subasta=' . rawurlencode($ref['subasta_id'])
-        : '';
+    $url = subastas_find_post_url_by_id($ref['subasta_id']);
 
     $resumen = '';
     if ($ref['subasta_id'] !== '') $resumen .= 'ID Subasta: ' . $ref['subasta_id'] . "\n";
@@ -312,6 +390,93 @@ function subastas_wpforms_autoreply($fields, $entry, $form_data, $entry_id) {
     wp_mail($investor_email, $subject, $body, $headers);
 }
 add_action('wpforms_process_complete', 'subastas_wpforms_autoreply', 10, 4);
+
+// ═══════════════════════════════════════════════════════════════
+// Redirecciones 301 y robots
+// ═══════════════════════════════════════════════════════════════
+
+// Devuelve la URL de /subastas-judiciales-{slug}/ si esa página está publicada.
+function subastas_hub_url_for_category_slug($slug) {
+    $page = get_page_by_path('subastas-judiciales-' . sanitize_title($slug));
+    if ($page && $page->post_status === 'publish') return get_permalink($page);
+    return '';
+}
+
+function subastas_index_url() {
+    $page = get_page_by_path('subastas-judiciales');
+    return ($page && $page->post_status === 'publish') ? get_permalink($page) : home_url('/');
+}
+
+function subastas_hub_url_for_post($post_id) {
+    foreach ((array) get_the_category($post_id) as $cat) {
+        $url = subastas_hub_url_for_category_slug($cat->slug);
+        if ($url) return $url;
+    }
+    return subastas_index_url();
+}
+
+function subastas_template_redirect() {
+    if (is_admin() || is_feed() || is_preview()) return;
+
+    // 1) Archivo de categoría de provincia → página provincial. Consolida las
+    //    señales en la página que queremos posicionar y evita que Google
+    //    indexe cientos de páginas /page/N/ con listados sin contenido propio.
+    if (SUBASTAS_REDIRECT_CATEGORY_TO_HUB && is_category()) {
+        $cat = get_queried_object();
+        if ($cat && isset($cat->slug)) {
+            $target = '';
+            if ($cat->slug === 'subastas' || $cat->slug === 'desconocida') {
+                $target = subastas_index_url();
+            } else {
+                $parent = $cat->parent ? get_term($cat->parent, 'category') : null;
+                if ($parent && !is_wp_error($parent) && $parent->slug === 'subastas') {
+                    $target = subastas_hub_url_for_category_slug($cat->slug);
+                }
+            }
+            if ($target) {
+                wp_safe_redirect($target, 301);
+                exit;
+            }
+        }
+    }
+
+    // 2) Ficha de subasta despublicada (finalizada/cancelada) → página
+    //    provincial, en lugar de un 404 que desperdicia el tráfico que llega
+    //    desde Google o desde enlaces compartidos.
+    if (SUBASTAS_REDIRECT_EXPIRED && is_404()) {
+        $path = trim((string) parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+        if ($path !== '' && strpos($path, '/') === false && strpos($path, 'subasta-') === 0) {
+            $posts = get_posts(array(
+                'name' => sanitize_title($path),
+                'post_type' => 'post',
+                'post_status' => array('draft', 'private', 'pending', 'trash'),
+                'numberposts' => 1,
+                'fields' => 'ids',
+                'no_found_rows' => true,
+            ));
+            $target = !empty($posts) ? subastas_hub_url_for_post($posts[0]) : subastas_index_url();
+            wp_safe_redirect($target, 301);
+            exit;
+        }
+    }
+}
+add_action('template_redirect', 'subastas_template_redirect', 5);
+
+// Archivos de etiquetas (una por localidad/tipo) y paginaciones de archivo:
+// contenido escaso y duplicado → noindex, follow.
+function subastas_rank_math_robots($robots) {
+    if (is_tag() || (is_archive() && is_paged())) {
+        $robots['index'] = 'noindex';
+        $robots['follow'] = 'follow';
+    }
+    return $robots;
+}
+add_filter('rank_math/frontend/robots', 'subastas_rank_math_robots');
+
+function subastas_sitemap_exclude_tags($exclude, $taxonomy) {
+    return $taxonomy === 'post_tag' ? true : $exclude;
+}
+add_filter('rank_math/sitemap/exclude_taxonomy', 'subastas_sitemap_exclude_tags', 10, 2);
 
 // ═══════════════════════════════════════════════════════════════
 // Página admin: "Inversores CAFAVE"
